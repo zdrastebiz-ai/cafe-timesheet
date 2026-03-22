@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Кафе — Табель сотрудников</title>
+<style>
+:root {
+  --primary: #2c3e50;
+  --accent: #e67e22;
+  --green: #27ae60;
+  --red: #e74c3c;
+  --bg: #f5f6fa;
+  --card: #fff;
+  --text: #2c3e50;
+  --border: #dcdde1;
+  --radius: 10px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* Header */
+.header {
+  background: var(--primary);
+  color: #fff;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.header h1 { font-size: 1.3rem; font-weight: 600; }
+.header-nav { display: flex; gap: 8px; }
+.header-nav button {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.3);
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+.header-nav button:hover { background: rgba(255,255,255,0.25); }
+.header-nav button.active { background: var(--accent); border-color: var(--accent); }
+
+/* Pages */
+.page { display: none; padding: 24px; max-width: 900px; margin: 0 auto; }
+.page.active { display: block; }
+
+/* Cards */
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+.card h2 { font-size: 1.1rem; margin-bottom: 12px; color: var(--primary); }
+
+/* Employee list */
+.employee-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.emp-card {
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+  transition: all 0.2s;
+  cursor: default;
+}
+.emp-card.on-shift {
+  border-color: var(--green);
+  background: #eafaf1;
+}
+.emp-card .emp-name { font-weight: 600; font-size: 1rem; margin-bottom: 4px; }
+.emp-card .emp-position { font-size: 0.85rem; color: #7f8c8d; margin-bottom: 10px; }
+.emp-card .emp-time { font-size: 0.8rem; color: #95a5a6; margin-bottom: 10px; }
+.emp-card button {
+  padding: 8px 20px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: #fff;
+  transition: opacity 0.2s;
+}
+.emp-card button:hover { opacity: 0.85; }
+.btn-start { background: var(--green); }
+.btn-end { background: var(--red); }
+
+/* Forms */
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 0.9rem; margin-bottom: 4px; font-weight: 500; }
+.form-group input, .form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  outline: none;
+}
+.form-group input:focus, .form-group select:focus { border-color: var(--accent); }
+.btn {
+  padding: 10px 24px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  cursor: pointer;
+  color: #fff;
+  background: var(--accent);
+  transition: opacity 0.2s;
+}
+.btn:hover { opacity: 0.85; }
+.btn-secondary { background: var(--primary); }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+th { background: var(--bg); font-weight: 600; position: sticky; top: 0; }
+tr:hover { background: #fafafa; }
+
+/* Modal */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 100;
+  justify-content: center;
+  align-items: center;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 24px;
+  width: 90%;
+  max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.modal h3 { margin-bottom: 16px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+/* Report */
+.report-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 16px; }
+.report-controls .form-group { margin-bottom: 0; }
+.total-row { font-weight: 700; background: #fef9e7 !important; }
+
+/* Print */
+@media print {
+  .header, .header-nav, .report-controls, .btn, button { display: none !important; }
+  .page { display: none !important; }
+  .page.print-active { display: block !important; padding: 0; }
+  .card { box-shadow: none; border: 1px solid #ccc; }
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .header { flex-direction: column; gap: 8px; }
+  .employee-grid { grid-template-columns: 1fr; }
+  .report-controls { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Кафе — Учёт смен</h1>
+  <div class="header-nav">
+    <button class="active" onclick="showPage('shifts')">Смены</button>
+    <button onclick="showPage('admin')">Админка</button>
+  </div>
+</div>
+
+<!-- ============ ПУБЛИЧНАЯ СТРАНИЦА: СМЕНЫ ============ -->
+<div id="page-shifts" class="page active">
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <h2>Сотрудники</h2>
+      <button class="btn" onclick="openAddEmployee()">+ Новый сотрудник</button>
+    </div>
+    <div id="employee-grid" class="employee-grid">
+      <p style="color:#95a5a6">Нет сотрудников. Добавьте первого.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Сегодняшние смены</h2>
+    <div id="today-shifts" style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Сотрудник</th><th>Должность</th><th>Начало</th><th>Конец</th><th>Часы</th></tr></thead>
+        <tbody id="today-shifts-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ============ АДМИНКА ============ -->
+<div id="page-admin" class="page">
+  <!-- Вход -->
+  <div id="admin-login" class="card">
+    <h2>Вход в админку</h2>
+    <div class="form-group">
+      <label>Пароль</label>
+      <input type="password" id="admin-pass" placeholder="Введите пароль" onkeydown="if(event.key==='Enter') loginAdmin()">
+    </div>
+    <button class="btn" onclick="loginAdmin()">Войти</button>
+    <p style="font-size:0.8rem;color:#95a5a6;margin-top:8px">Пароль по умолчанию: admin</p>
+  </div>
+
+  <!-- Панель админки -->
+  <div id="admin-panel" style="display:none">
+    <!-- Управление сотрудниками -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h2 style="margin-bottom:0">Управление сотрудниками</h2>
+        <button class="btn" onclick="openAdminAddEmployee()">+ Новый сотрудник</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>ФИО</th><th>Должность</th><th>Дата рождения</th><th>Реквизиты</th><th>Ставка/час</th><th>Действия</th></tr></thead>
+          <tbody id="admin-employees-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Управление должностями -->
+    <div class="card">
+      <h2>Должности</h2>
+      <div id="positions-list" style="margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="new-position" placeholder="Новая должность" style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius)">
+        <button class="btn" onclick="addPosition()">Добавить</button>
+      </div>
+    </div>
+
+    <!-- Отчёты -->
+    <div class="card">
+      <h2>Отчёты по зарплате</h2>
+      <div class="report-controls">
+        <div class="form-group">
+          <label>Тип отчёта</label>
+          <select id="report-type" onchange="toggleReportDates()">
+            <option value="weekly">Еженедельный</option>
+            <option value="bimonthly">Полумесячный (10 и 25)</option>
+          </select>
+        </div>
+        <div class="form-group" id="report-week-group">
+          <label>Неделя (начало)</label>
+          <input type="date" id="report-week-start">
+        </div>
+        <div class="form-group" id="report-month-group" style="display:none">
+          <label>Месяц</label>
+          <input type="month" id="report-month">
+        </div>
+        <div class="form-group" id="report-half-group" style="display:none">
+          <label>Период</label>
+          <select id="report-half">
+            <option value="first">1–10 (первая половина)</option>
+            <option value="second">11–25 (вторая половина)</option>
+          </select>
+        </div>
+        <button class="btn btn-secondary" onclick="generateReport()">Сформировать</button>
+        <button class="btn" onclick="printReport()">Печать</button>
+      </div>
+      <div id="report-result" style="overflow-x:auto"></div>
+    </div>
+
+    <!-- Смена пароля -->
+    <div class="card">
+      <h2>Сменить пароль админки</h2>
+      <div class="form-group">
+        <label>Новый пароль</label>
+        <input type="password" id="new-admin-pass">
+      </div>
+      <button class="btn" onclick="changeAdminPass()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ МОДАЛКА: НОВЫЙ / РЕДАКТИРОВАНИЕ СОТРУДНИКА ============ -->
+<div class="modal-overlay" id="modal-add-employee">
+  <div class="modal">
+    <h3 id="emp-modal-title">Новый сотрудник</h3>
+    <input type="hidden" id="emp-edit-id" value="">
+    <div class="form-group">
+      <label>ФИО</label>
+      <input type="text" id="emp-name" placeholder="Иванов Иван Иванович">
+    </div>
+    <div class="form-group">
+      <label>Дата рождения</label>
+      <input type="date" id="emp-dob">
+    </div>
+    <div class="form-group">
+      <label>Должность</label>
+      <select id="emp-position"></select>
+    </div>
+    <div id="emp-requisites" style="display:none">
+      <hr style="margin:14px 0;border:none;border-top:1px solid var(--border)">
+      <p style="font-size:0.85rem;color:#7f8c8d;margin-bottom:10px">Реквизиты для выплат</p>
+      <div class="form-group">
+        <label>Телефон</label>
+        <input type="tel" id="emp-phone" placeholder="+7 (900) 123-45-67">
+      </div>
+      <div class="form-group">
+        <label>Банк</label>
+        <input type="text" id="emp-bank" placeholder="Сбербанк">
+      </div>
+      <div class="form-group">
+        <label>Номер карты</label>
+        <input type="text" id="emp-card" placeholder="0000 0000 0000 0000" maxlength="19" oninput="formatCardNumber(this)">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-add-employee')">Отмена</button>
+      <button class="btn" onclick="saveEmployee()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ МОДАЛКА: СТАВКА ============ -->
+<div class="modal-overlay" id="modal-set-rate">
+  <div class="modal">
+    <h3>Назначить ставку</h3>
+    <input type="hidden" id="rate-emp-id">
+    <div class="form-group">
+      <label>Ставка за час (руб.)</label>
+      <input type="number" id="rate-value" min="0" step="10" placeholder="300">
+    </div>
+    <div class="form-group">
+      <label>Действует с</label>
+      <input type="date" id="rate-from">
+    </div>
+    <div id="rate-history" style="margin-top:8px;font-size:0.85rem;color:#7f8c8d"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-set-rate')">Отмена</button>
+      <button class="btn" onclick="saveRate()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== DATABASE (IndexedDB) ====================
+const DB_NAME = 'CafeTimesheetDB';
+const DB_VERSION = 1;
+let db;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('employees')) {
+        const es = d.createObjectStore('employees', { keyPath: 'id', autoIncrement: true });
+        es.createIndex('name', 'name', { unique: false });
+      }
+      if (!d.objectStoreNames.contains('shifts')) {
+        const ss = d.createObjectStore('shifts', { keyPath: 'id', autoIncrement: true });
+        ss.createIndex('employeeId', 'employeeId', { unique: false });
+        ss.createIndex('date', 'date', { unique: false });
+      }
+      if (!d.objectStoreNames.contains('rates')) {
+        const rs = d.createObjectStore('rates', { keyPath: 'id', autoIncrement: true });
+        rs.createIndex('employeeId', 'employeeId', { unique: false });
+      }
+      if (!d.objectStoreNames.contains('positions')) {
+        d.createObjectStore('positions', { keyPath: 'id', autoIncrement: true });
+      }
+      if (!d.objectStoreNames.contains('settings')) {
+        d.createObjectStore('settings', { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = (e) => { db = e.target.result; resolve(db); };
+    req.onerror = (e) => reject(e);
+  });
+}
+
+function dbGetAll(store) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = (e) => reject(e);
+  });
+}
+
+function dbAdd(store, data) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    const req = tx.objectStore(store).add(data);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = (e) => reject(e);
+  });
+}
+
+function dbPut(store, data) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    const req = tx.objectStore(store).put(data);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = (e) => reject(e);
+  });
+}
+
+function dbGet(store, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readonly');
+    const req = tx.objectStore(store).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = (e) => reject(e);
+  });
+}
+
+function dbDelete(store, key) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    const req = tx.objectStore(store).delete(key);
+    req.onsuccess = () => resolve();
+    req.onerror = (e) => reject(e);
+  });
+}
+
+// ==================== UTILS ====================
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+function nowStr() { return new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); }
+function formatDate(d) { return new Date(d).toLocaleDateString('ru-RU'); }
+function formatHours(minutes) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h + 'ч ' + (m < 10 ? '0' : '') + m + 'м';
+}
+function parseTime(str) {
+  const [h, m] = str.split(':').map(Number);
+  return h * 60 + m;
+}
+function minutesBetween(start, end) {
+  return parseTime(end) - parseTime(start);
+}
+
+// ==================== PAGE NAVIGATION ====================
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active', 'print-active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.header-nav button').forEach((b, i) => {
+    b.classList.toggle('active', (i === 0 && name === 'shifts') || (i === 1 && name === 'admin'));
+  });
+  if (name === 'shifts') { renderEmployees(); renderTodayShifts(); }
+}
+
+// ==================== MODAL ====================
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+// ==================== POSITIONS ====================
+const DEFAULT_POSITIONS = ['Бариста', 'Повар', 'Официант', 'Кассир', 'Администратор', 'Уборщик'];
+
+async function initPositions() {
+  const positions = await dbGetAll('positions');
+  if (positions.length === 0) {
+    for (const p of DEFAULT_POSITIONS) {
+      await dbAdd('positions', { name: p });
+    }
+  }
+}
+
+async function renderPositionSelect() {
+  const positions = await dbGetAll('positions');
+  const sel = document.getElementById('emp-position');
+  sel.innerHTML = positions.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+}
+
+async function renderPositionsList() {
+  const positions = await dbGetAll('positions');
+  const el = document.getElementById('positions-list');
+  if (!el) return;
+  el.innerHTML = positions.map(p =>
+    `<span style="display:inline-block;background:var(--bg);padding:6px 12px;border-radius:20px;margin:3px;font-size:0.85rem">${p.name} <span style="cursor:pointer;color:var(--red);margin-left:4px" onclick="removePosition(${p.id})">&times;</span></span>`
+  ).join('');
+}
+
+async function addPosition() {
+  const input = document.getElementById('new-position');
+  const name = input.value.trim();
+  if (!name) return;
+  await dbAdd('positions', { name });
+  input.value = '';
+  renderPositionsList();
+}
+
+async function removePosition(id) {
+  await dbDelete('positions', id);
+  renderPositionsList();
+}
+
+// ==================== EMPLOYEES ====================
+async function renderEmployees() {
+  const employees = await dbGetAll('employees');
+  const shifts = await dbGetAll('shifts');
+  const today = todayStr();
+  const grid = document.getElementById('employee-grid');
+
+  if (employees.length === 0) {
+    grid.innerHTML = '<p style="color:#95a5a6">Нет сотрудников. Добавьте первого.</p>';
+    return;
+  }
+
+  grid.innerHTML = employees.map(emp => {
+    const activeShift = shifts.find(s => s.employeeId === emp.id && s.date === today && !s.endTime);
+    const isOnShift = !!activeShift;
+    return `
+      <div class="emp-card ${isOnShift ? 'on-shift' : ''}">
+        <div class="emp-name">${emp.name}</div>
+        <div class="emp-position">${emp.position}</div>
+        ${isOnShift ? `<div class="emp-time">С ${activeShift.startTime}</div>` : ''}
+        ${isOnShift
+          ? `<button class="btn-end" onclick="endShift(${activeShift.id})">Закрыть смену</button>`
+          : `<button class="btn-start" onclick="startShift(${emp.id})">На смене</button>`
+        }
+      </div>
+    `;
+  }).join('');
+}
+
+async function startShift(employeeId) {
+  const today = todayStr();
+  const shifts = await dbGetAll('shifts');
+  const existing = shifts.find(s => s.employeeId === employeeId && s.date === today && !s.endTime);
+  if (existing) { alert('Смена уже открыта!'); return; }
+
+  await dbAdd('shifts', {
+    employeeId,
+    date: today,
+    startTime: nowStr(),
+    endTime: null
+  });
+  renderEmployees();
+  renderTodayShifts();
+}
+
+async function endShift(shiftId) {
+  const shift = await dbGet('shifts', shiftId);
+  if (!shift) return;
+  shift.endTime = nowStr();
+  await dbPut('shifts', shift);
+  renderEmployees();
+  renderTodayShifts();
+}
+
+async function renderTodayShifts() {
+  const employees = await dbGetAll('employees');
+  const shifts = await dbGetAll('shifts');
+  const today = todayStr();
+  const todayShifts = shifts.filter(s => s.date === today);
+  const tbody = document.getElementById('today-shifts-body');
+
+  if (todayShifts.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:#95a5a6;text-align:center">Нет смен за сегодня</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = todayShifts.map(s => {
+    const emp = employees.find(e => e.id === s.employeeId);
+    const mins = s.endTime ? minutesBetween(s.startTime, s.endTime) : null;
+    return `<tr>
+      <td>${emp ? emp.name : '—'}</td>
+      <td>${emp ? emp.position : '—'}</td>
+      <td>${s.startTime}</td>
+      <td>${s.endTime || '<em>на смене</em>'}</td>
+      <td>${mins !== null ? formatHours(mins) : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ==================== ADD / EDIT EMPLOYEE ====================
+let employeeEditSource = 'public'; // 'public' or 'admin'
+
+function clearRequisites() {
+  document.getElementById('emp-phone').value = '';
+  document.getElementById('emp-bank').value = '';
+  document.getElementById('emp-card').value = '';
+}
+
+function showRequisites(show) {
+  document.getElementById('emp-requisites').style.display = show ? '' : 'none';
+}
+
+function formatCardNumber(input) {
+  let v = input.value.replace(/\D/g, '').slice(0, 16);
+  input.value = v.replace(/(\d{4})(?=\d)/g, '$1 ');
+}
+
+function maskCard(card) {
+  if (!card) return '';
+  const digits = card.replace(/\D/g, '');
+  if (digits.length < 8) return card;
+  return '**** **** **** ' + digits.slice(-4);
+}
+
+async function openAddEmployee() {
+  employeeEditSource = 'public';
+  await renderPositionSelect();
+  document.getElementById('emp-modal-title').textContent = 'Новый сотрудник';
+  document.getElementById('emp-edit-id').value = '';
+  document.getElementById('emp-name').value = '';
+  document.getElementById('emp-dob').value = '';
+  clearRequisites();
+  showRequisites(false);
+  openModal('modal-add-employee');
+}
+
+async function openAdminAddEmployee() {
+  employeeEditSource = 'admin';
+  await renderPositionSelect();
+  document.getElementById('emp-modal-title').textContent = 'Новый сотрудник';
+  document.getElementById('emp-edit-id').value = '';
+  document.getElementById('emp-name').value = '';
+  document.getElementById('emp-dob').value = '';
+  clearRequisites();
+  showRequisites(true);
+  openModal('modal-add-employee');
+}
+
+async function openEditEmployee(empId) {
+  employeeEditSource = 'admin';
+  const emp = await dbGet('employees', empId);
+  if (!emp) return;
+  await renderPositionSelect();
+  document.getElementById('emp-modal-title').textContent = 'Редактирование сотрудника';
+  document.getElementById('emp-edit-id').value = empId;
+  document.getElementById('emp-name').value = emp.name;
+  document.getElementById('emp-dob').value = emp.dob;
+  document.getElementById('emp-phone').value = emp.phone || '';
+  document.getElementById('emp-bank').value = emp.bank || '';
+  document.getElementById('emp-card').value = emp.card || '';
+  showRequisites(true);
+  const sel = document.getElementById('emp-position');
+  sel.value = emp.position;
+  if (!sel.value) {
+    const opt = document.createElement('option');
+    opt.value = emp.position;
+    opt.textContent = emp.position;
+    sel.appendChild(opt);
+    sel.value = emp.position;
+  }
+  openModal('modal-add-employee');
+}
+
+async function saveEmployee() {
+  const editId = document.getElementById('emp-edit-id').value;
+  const name = document.getElementById('emp-name').value.trim();
+  const dob = document.getElementById('emp-dob').value;
+  const position = document.getElementById('emp-position').value;
+  const phone = document.getElementById('emp-phone').value.trim();
+  const bank = document.getElementById('emp-bank').value.trim();
+  const card = document.getElementById('emp-card').value.trim();
+
+  if (!name) { alert('Введите ФИО'); return; }
+  if (!dob) { alert('Введите дату рождения'); return; }
+  if (!position) { alert('Выберите должность'); return; }
+
+  if (editId) {
+    const emp = await dbGet('employees', Number(editId));
+    emp.name = name;
+    emp.dob = dob;
+    emp.position = position;
+    emp.phone = phone;
+    emp.bank = bank;
+    emp.card = card;
+    await dbPut('employees', emp);
+  } else {
+    await dbAdd('employees', { name, dob, position, phone, bank, card });
+  }
+
+  closeModal('modal-add-employee');
+  renderEmployees();
+  if (employeeEditSource === 'admin') {
+    renderAdminEmployees();
+  }
+}
+
+// ==================== ADMIN ====================
+async function initAdmin() {
+  const pass = await dbGet('settings', 'adminPassword');
+  if (!pass) {
+    await dbPut('settings', { key: 'adminPassword', value: 'admin' });
+  }
+}
+
+async function loginAdmin() {
+  const input = document.getElementById('admin-pass').value;
+  const stored = await dbGet('settings', 'adminPassword');
+  if (input === stored.value) {
+    document.getElementById('admin-login').style.display = 'none';
+    document.getElementById('admin-panel').style.display = 'block';
+    renderAdminEmployees();
+    renderPositionsList();
+    // Set default dates
+    const today = new Date();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1));
+    document.getElementById('report-week-start').value = monday.toISOString().slice(0, 10);
+    document.getElementById('report-month').value = today.toISOString().slice(0, 7);
+  } else {
+    alert('Неверный пароль');
+  }
+}
+
+async function changeAdminPass() {
+  const newPass = document.getElementById('new-admin-pass').value;
+  if (!newPass || newPass.length < 3) { alert('Пароль слишком короткий'); return; }
+  await dbPut('settings', { key: 'adminPassword', value: newPass });
+  alert('Пароль изменён');
+  document.getElementById('new-admin-pass').value = '';
+}
+
+async function renderAdminEmployees() {
+  const employees = await dbGetAll('employees');
+  const rates = await dbGetAll('rates');
+  const tbody = document.getElementById('admin-employees-body');
+
+  if (employees.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="color:#95a5a6;text-align:center">Нет сотрудников</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = employees.map(emp => {
+    const empRates = rates.filter(r => r.employeeId === emp.id).sort((a, b) => b.fromDate.localeCompare(a.fromDate));
+    const currentRate = empRates.length > 0 ? empRates[0] : null;
+    const hasReq = emp.phone || emp.bank || emp.card;
+    const reqHtml = hasReq
+      ? [emp.phone, emp.bank, emp.card ? maskCard(emp.card) : ''].filter(Boolean).join('<br>')
+      : '<span style="color:#95a5a6">—</span>';
+    return `<tr>
+      <td>${emp.name}</td>
+      <td>${emp.position}</td>
+      <td>${formatDate(emp.dob)}</td>
+      <td style="font-size:0.83rem">${reqHtml}</td>
+      <td>${currentRate ? currentRate.rate + ' руб/ч' : '<span style="color:var(--red)">не задана</span>'}
+        ${currentRate ? '<br><small style="color:#95a5a6">с ' + formatDate(currentRate.fromDate) + '</small>' : ''}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-secondary" style="padding:5px 12px;font-size:0.8rem" onclick="openEditEmployee(${emp.id})">Ред.</button>
+        <button class="btn" style="padding:5px 12px;font-size:0.8rem" onclick="openSetRate(${emp.id})">Ставка</button>
+        <button class="btn btn-secondary" style="padding:5px 12px;font-size:0.8rem;background:var(--red)" onclick="deleteEmployee(${emp.id})">Удалить</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function deleteEmployee(id) {
+  if (!confirm('Удалить сотрудника? Все его смены и ставки будут сохранены в истории.')) return;
+  await dbDelete('employees', id);
+  renderAdminEmployees();
+  renderEmployees();
+}
+
+// ==================== RATES ====================
+async function openSetRate(empId) {
+  document.getElementById('rate-emp-id').value = empId;
+  document.getElementById('rate-value').value = '';
+  document.getElementById('rate-from').value = todayStr();
+
+  const rates = await dbGetAll('rates');
+  const empRates = rates.filter(r => r.employeeId === empId).sort((a, b) => b.fromDate.localeCompare(a.fromDate));
+  const historyEl = document.getElementById('rate-history');
+  if (empRates.length > 0) {
+    historyEl.innerHTML = '<strong>История ставок:</strong><br>' +
+      empRates.map(r => `${r.rate} руб/ч — с ${formatDate(r.fromDate)}`).join('<br>');
+  } else {
+    historyEl.innerHTML = '<em>Ставка ещё не задана</em>';
+  }
+
+  openModal('modal-set-rate');
+}
+
+async function saveRate() {
+  const empId = Number(document.getElementById('rate-emp-id').value);
+  const rate = Number(document.getElementById('rate-value').value);
+  const fromDate = document.getElementById('rate-from').value;
+
+  if (!rate || rate <= 0) { alert('Введите ставку'); return; }
+  if (!fromDate) { alert('Укажите дату начала действия'); return; }
+
+  await dbAdd('rates', { employeeId: empId, rate, fromDate });
+  closeModal('modal-set-rate');
+  renderAdminEmployees();
+}
+
+// Get rate for employee on a specific date
+function getRateForDate(rates, empId, dateStr) {
+  const empRates = rates
+    .filter(r => r.employeeId === empId && r.fromDate <= dateStr)
+    .sort((a, b) => b.fromDate.localeCompare(a.fromDate));
+  return empRates.length > 0 ? empRates[0].rate : 0;
+}
+
+// ==================== REPORTS ====================
+function toggleReportDates() {
+  const type = document.getElementById('report-type').value;
+  document.getElementById('report-week-group').style.display = type === 'weekly' ? '' : 'none';
+  document.getElementById('report-month-group').style.display = type === 'bimonthly' ? '' : 'none';
+  document.getElementById('report-half-group').style.display = type === 'bimonthly' ? '' : 'none';
+}
+
+async function generateReport() {
+  const type = document.getElementById('report-type').value;
+  const employees = await dbGetAll('employees');
+  const shifts = await dbGetAll('shifts');
+  const rates = await dbGetAll('rates');
+
+  let startDate, endDate, title;
+
+  if (type === 'weekly') {
+    startDate = document.getElementById('report-week-start').value;
+    const end = new Date(startDate);
+    end.setDate(end.getDate() + 6);
+    endDate = end.toISOString().slice(0, 10);
+    title = `Еженедельный отчёт: ${formatDate(startDate)} — ${formatDate(endDate)}`;
+  } else {
+    const month = document.getElementById('report-month').value;
+    const half = document.getElementById('report-half').value;
+    const [year, mon] = month.split('-').map(Number);
+    if (half === 'first') {
+      startDate = `${month}-01`;
+      endDate = `${month}-10`;
+      title = `Зарплата за 1–10 ${getMonthName(mon)} ${year}`;
+    } else {
+      startDate = `${month}-11`;
+      endDate = `${month}-25`;
+      title = `Зарплата за 11–25 ${getMonthName(mon)} ${year}`;
+    }
+  }
+
+  const periodShifts = shifts.filter(s => s.date >= startDate && s.date <= endDate && s.endTime);
+
+  let rows = employees.map(emp => {
+    const empShifts = periodShifts.filter(s => s.employeeId === emp.id);
+    let totalMinutes = 0;
+    let totalPay = 0;
+    let daysWorked = 0;
+
+    const dayDetails = [];
+    empShifts.forEach(s => {
+      const mins = minutesBetween(s.startTime, s.endTime);
+      if (mins > 0) {
+        totalMinutes += mins;
+        daysWorked++;
+        const rate = getRateForDate(rates, emp.id, s.date);
+        const pay = (mins / 60) * rate;
+        totalPay += pay;
+        dayDetails.push({ date: s.date, mins, rate, pay });
+      }
+    });
+
+    return { emp, totalMinutes, totalPay: Math.round(totalPay), daysWorked, dayDetails };
+  }).filter(r => r.daysWorked > 0 || true);
+
+  let grandTotal = rows.reduce((sum, r) => sum + r.totalPay, 0);
+
+  const resultEl = document.getElementById('report-result');
+  resultEl.innerHTML = `
+    <h3 style="margin-bottom:12px">${title}</h3>
+    <table>
+      <thead>
+        <tr><th>ФИО</th><th>Должность</th><th>Дней</th><th>Часов</th><th>Ставка</th><th>К выплате</th></tr>
+      </thead>
+      <tbody>
+        ${rows.map(r => `<tr>
+          <td>${r.emp.name}</td>
+          <td>${r.emp.position}</td>
+          <td>${r.daysWorked}</td>
+          <td>${formatHours(r.totalMinutes)}</td>
+          <td>${r.dayDetails.length > 0 ? getRateForDate(rates, r.emp.id, endDate) + ' руб/ч' : '—'}</td>
+          <td><strong>${r.totalPay.toLocaleString('ru-RU')} руб.</strong></td>
+        </tr>`).join('')}
+        <tr class="total-row">
+          <td colspan="5">ИТОГО</td>
+          <td><strong>${grandTotal.toLocaleString('ru-RU')} руб.</strong></td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+}
+
+function getMonthName(m) {
+  return ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'][m - 1];
+}
+
+function printReport() {
+  const adminPage = document.getElementById('page-admin');
+  adminPage.classList.add('print-active');
+  window.print();
+  adminPage.classList.remove('print-active');
+}
+
+// ==================== INIT ====================
+(async function init() {
+  await openDB();
+  await initPositions();
+  await initAdmin();
+  renderEmployees();
+  renderTodayShifts();
+})();
+</script>
+</body>
+</html>
