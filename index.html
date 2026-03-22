@@ -141,6 +141,33 @@ tr:hover { background: #fafafa; }
 .modal h3 { margin-bottom: 16px; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 
+/* Calendar */
+.calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.calendar-header button { background: none; border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 14px; cursor: pointer; font-size: 1rem; }
+.calendar-header button:hover { background: var(--bg); }
+.calendar-header .cal-title { font-weight: 600; font-size: 1rem; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-weekday { text-align: center; font-size: 0.75rem; font-weight: 600; color: #7f8c8d; padding: 6px 0; }
+.cal-day {
+  text-align: center;
+  padding: 8px 4px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  min-height: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.cal-day.empty { background: none; }
+.cal-day.today { border: 2px solid var(--accent); }
+.cal-day.has-shift { background: #eafaf1; cursor: pointer; }
+.cal-day.has-shift:hover { background: #d5f5e3; }
+.cal-day .cal-num { font-weight: 600; font-size: 0.9rem; }
+.cal-day .cal-hours { font-size: 0.7rem; color: var(--green); font-weight: 600; }
+.cal-month-total { margin-top: 12px; padding: 10px; background: var(--bg); border-radius: var(--radius); font-size: 0.9rem; text-align: center; }
+
 /* Report */
 .report-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 16px; }
 .report-controls .form-group { margin-bottom: 0; }
@@ -181,6 +208,24 @@ tr:hover { background: #fafafa; }
     </div>
     <div id="employee-grid" class="employee-grid">
       <p style="color:#95a5a6">Нет сотрудников. Добавьте первого.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Мои смены — календарь</h2>
+    <div class="form-group" style="max-width:280px;margin-bottom:12px">
+      <label>Выберите сотрудника</label>
+      <select id="cal-employee" onchange="renderCalendar()"></select>
+    </div>
+    <div id="calendar-container" style="display:none">
+      <div class="calendar-header">
+        <button onclick="calPrevMonth()">&larr;</button>
+        <span class="cal-title" id="cal-month-title"></span>
+        <button onclick="calNextMonth()">&rarr;</button>
+      </div>
+      <div class="calendar-grid" id="cal-grid"></div>
+      <div class="cal-month-total" id="cal-month-total"></div>
+      <div id="cal-day-detail" style="margin-top:10px;display:none"></div>
     </div>
   </div>
 
@@ -444,7 +489,7 @@ function showPage(name) {
   document.querySelectorAll('.header-nav button').forEach((b, i) => {
     b.classList.toggle('active', (i === 0 && name === 'shifts') || (i === 1 && name === 'admin'));
   });
-  if (name === 'shifts') { renderEmployees(); renderTodayShifts(); }
+  if (name === 'shifts') { renderEmployees(); renderTodayShifts(); populateCalEmployeeSelect(); }
 }
 
 // ==================== MODAL ====================
@@ -569,6 +614,125 @@ async function renderTodayShifts() {
       <td>${mins !== null ? formatHours(mins) : '—'}</td>
     </tr>`;
   }).join('');
+}
+
+// ==================== CALENDAR ====================
+let calYear, calMonth; // 0-based month
+
+function initCalendarDate() {
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+}
+initCalendarDate();
+
+function calPrevMonth() {
+  calMonth--;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+function calNextMonth() {
+  calMonth++;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  renderCalendar();
+}
+
+async function populateCalEmployeeSelect() {
+  const employees = await dbGetAll('employees');
+  const sel = document.getElementById('cal-employee');
+  sel.innerHTML = '<option value="">— выберите —</option>' +
+    employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+}
+
+const WEEKDAYS_SHORT = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+const MONTH_NAMES = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+async function renderCalendar() {
+  const empId = Number(document.getElementById('cal-employee').value);
+  const container = document.getElementById('calendar-container');
+  if (!empId) { container.style.display = 'none'; return; }
+  container.style.display = '';
+
+  const shifts = await dbGetAll('shifts');
+  const empShifts = shifts.filter(s => s.employeeId === empId && s.endTime);
+
+  // Build map: date -> total minutes
+  const dayMap = {};
+  empShifts.forEach(s => {
+    const mins = minutesBetween(s.startTime, s.endTime);
+    if (mins > 0) {
+      dayMap[s.date] = (dayMap[s.date] || 0) + mins;
+    }
+  });
+
+  // Title
+  document.getElementById('cal-month-title').textContent = `${MONTH_NAMES[calMonth]} ${calYear}`;
+
+  // Build grid
+  const firstDay = new Date(calYear, calMonth, 1);
+  const lastDay = new Date(calYear, calMonth + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  // Monday=0 ... Sunday=6
+  let startWeekday = firstDay.getDay() - 1;
+  if (startWeekday < 0) startWeekday = 6;
+
+  const todayISO = todayStr();
+  let html = WEEKDAYS_SHORT.map(d => `<div class="cal-weekday">${d}</div>`).join('');
+
+  // Empty cells before 1st
+  for (let i = 0; i < startWeekday; i++) {
+    html += '<div class="cal-day empty"></div>';
+  }
+
+  let totalMonthMins = 0;
+  let totalDays = 0;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const mins = dayMap[dateStr] || 0;
+    const isToday = dateStr === todayISO;
+    const hasShift = mins > 0;
+    if (hasShift) { totalMonthMins += mins; totalDays++; }
+
+    let classes = 'cal-day';
+    if (isToday) classes += ' today';
+    if (hasShift) classes += ' has-shift';
+
+    html += `<div class="${classes}" ${hasShift ? `onclick="showCalDayDetail('${dateStr}', ${empId})"` : ''}>
+      <span class="cal-num">${d}</span>
+      ${hasShift ? `<span class="cal-hours">${formatHours(mins)}</span>` : ''}
+    </div>`;
+  }
+
+  document.getElementById('cal-grid').innerHTML = html;
+  document.getElementById('cal-month-total').innerHTML =
+    `За ${MONTH_NAMES[calMonth].toLowerCase()}: <strong>${totalDays}</strong> дн. / <strong>${formatHours(totalMonthMins)}</strong>`;
+  document.getElementById('cal-day-detail').style.display = 'none';
+}
+
+async function showCalDayDetail(dateStr, empId) {
+  const shifts = await dbGetAll('shifts');
+  const dayShifts = shifts.filter(s => s.employeeId === empId && s.date === dateStr && s.endTime);
+  const el = document.getElementById('cal-day-detail');
+
+  if (dayShifts.length === 0) { el.style.display = 'none'; return; }
+
+  let totalMins = 0;
+  const rows = dayShifts.map(s => {
+    const mins = minutesBetween(s.startTime, s.endTime);
+    totalMins += mins;
+    return `<tr><td>${s.startTime}</td><td>${s.endTime}</td><td>${formatHours(mins)}</td></tr>`;
+  }).join('');
+
+  el.style.display = '';
+  el.innerHTML = `
+    <strong>${formatDate(dateStr)}</strong>
+    <table style="margin-top:6px">
+      <thead><tr><th>Начало</th><th>Конец</th><th>Часы</th></tr></thead>
+      <tbody>${rows}
+        <tr class="total-row"><td colspan="2">Итого</td><td>${formatHours(totalMins)}</td></tr>
+      </tbody>
+    </table>`;
 }
 
 // ==================== ADD / EDIT EMPLOYEE ====================
@@ -899,6 +1063,7 @@ function printReport() {
   await initAdmin();
   renderEmployees();
   renderTodayShifts();
+  populateCalEmployeeSelect();
 })();
 </script>
 </body>
