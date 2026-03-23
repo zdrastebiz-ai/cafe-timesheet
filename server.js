@@ -78,9 +78,18 @@ async function initDatabase() {
     db.run("INSERT INTO settings (key, value) VALUES ('adminPassword', 'admin')");
   }
 
-  // Email по умолчанию
-  if (!dbGet("SELECT value FROM settings WHERE key='emailTo'")) {
-    db.run("INSERT INTO settings (key, value) VALUES ('emailTo', 'rv87@bk.ru')");
+  // Email настройки по умолчанию (Mail.ru / bk.ru)
+  const emailDefaults = {
+    emailTo: 'rv87@bk.ru',
+    smtpHost: 'smtp.mail.ru',
+    smtpPort: '465',
+    smtpUser: 'rv87@bk.ru',
+    smtpPass: ''
+  };
+  for (const [key, value] of Object.entries(emailDefaults)) {
+    if (!dbGet("SELECT value FROM settings WHERE key=?", [key])) {
+      db.run("INSERT INTO settings (key, value) VALUES (?,?)", [key, value]);
+    }
   }
 
   saveDb();
