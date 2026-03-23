@@ -229,7 +229,7 @@ tr:hover { background: #fafafa; }
       </div>
       <div style="overflow-x:auto">
         <table>
-          <thead><tr><th>ФИО</th><th>Должность</th><th>Дата рождения</th><th>Дата приёма</th><th>Выплата</th><th>Реквизиты</th><th>Ставка/час</th><th>Действия</th></tr></thead>
+          <thead><tr><th>ФИО</th><th>Должность</th><th>Заведение</th><th>Дата рождения</th><th>Дата приёма</th><th>Выплата</th><th>Реквизиты</th><th>Ставка/час</th><th>Действия</th></tr></thead>
           <tbody id="admin-employees-body"></tbody>
         </table>
       </div>
@@ -376,6 +376,16 @@ tr:hover { background: #fafafa; }
         <option value="weekly">Еженедельно (каждый понедельник)</option>
         <option value="bimonthly">2 раза в месяц (10 и 25 числа)</option>
       </select>
+    </div>
+    <div id="emp-venue-group" style="display:none">
+      <div class="form-group">
+        <label>Заведение</label>
+        <select id="emp-venue">
+          <option value="Кафе">Кафе</option>
+          <option value="Пельменная">Пельменная</option>
+          <option value="Универсал">Универсал</option>
+        </select>
+      </div>
     </div>
     <div id="emp-hire-group" style="display:none">
       <div class="form-group">
@@ -685,6 +695,7 @@ function clearRequisites() {
 }
 function showAdminFields(show) {
   document.getElementById('emp-hire-group').style.display = show ? '' : 'none';
+  document.getElementById('emp-venue-group').style.display = show ? '' : 'none';
 }
 function showPayType(show) {
   document.getElementById('emp-pay-type').closest('.form-group').style.display = show ? '' : 'none';
@@ -724,6 +735,7 @@ async function openAdminAddEmployee() {
   document.getElementById('emp-name').value = '';
   document.getElementById('emp-dob').value = '';
   document.getElementById('emp-pay-type').value = 'weekly';
+  document.getElementById('emp-venue').value = 'Кафе';
   document.getElementById('emp-hire-date').value = todayStr();
   clearRequisites();
   showPayType(true);
@@ -743,6 +755,7 @@ async function openEditEmployee(empId) {
   document.getElementById('emp-name').value = emp.name;
   document.getElementById('emp-dob').value = emp.dob;
   document.getElementById('emp-pay-type').value = emp.payType || 'weekly';
+  document.getElementById('emp-venue').value = emp.venue || 'Кафе';
   document.getElementById('emp-hire-date').value = emp.hireDate || '';
   document.getElementById('emp-phone').value = emp.phone || '';
   document.getElementById('emp-bank').value = emp.bank || '';
@@ -766,6 +779,7 @@ async function saveEmployee() {
   const dob = document.getElementById('emp-dob').value;
   const position = document.getElementById('emp-position').value;
   const payType = document.getElementById('emp-pay-type').value;
+  const venue = document.getElementById('emp-venue').value;
   const hireDate = document.getElementById('emp-hire-date').value;
   const phone = document.getElementById('emp-phone').value.trim();
   const bank = document.getElementById('emp-bank').value.trim();
@@ -775,7 +789,7 @@ async function saveEmployee() {
   if (!dob) { alert('Введите дату рождения'); return; }
   if (!position) { alert('Выберите должность'); return; }
 
-  const data = { name, dob, position, payType, hireDate, phone, bank, card };
+  const data = { name, dob, position, payType, venue, hireDate, phone, bank, card };
 
   if (editId) {
     await api.put('/api/employees/' + editId, data);
@@ -819,7 +833,7 @@ async function renderAdminEmployees() {
   const tbody = document.getElementById('admin-employees-body');
 
   if (employees.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="color:#95a5a6;text-align:center">Нет сотрудников</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="color:#95a5a6;text-align:center">Нет сотрудников</td></tr>';
     return;
   }
 
@@ -836,6 +850,7 @@ async function renderAdminEmployees() {
     return `<tr>
       <td>${emp.name}</td>
       <td>${emp.position}</td>
+      <td>${emp.venue || 'Кафе'}</td>
       <td>${formatDate(emp.dob)}</td>
       <td>${emp.hireDate ? formatDate(emp.hireDate) : '<span style="color:#95a5a6">—</span>'}</td>
       <td>${payTypeLabel}</td>

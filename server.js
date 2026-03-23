@@ -64,7 +64,7 @@ async function initDatabase() {
   db.run(`CREATE TABLE IF NOT EXISTS employees (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL, dob TEXT NOT NULL, position TEXT NOT NULL,
-    payType TEXT DEFAULT 'weekly', hireDate TEXT DEFAULT '',
+    payType TEXT DEFAULT 'weekly', venue TEXT DEFAULT 'Кафе', hireDate TEXT DEFAULT '',
     phone TEXT DEFAULT '', bank TEXT DEFAULT '', card TEXT DEFAULT ''
   )`);
   db.run(`CREATE TABLE IF NOT EXISTS shifts (
@@ -82,6 +82,7 @@ async function initDatabase() {
 
   // Миграция: добавить hireDate если нет
   try { db.run("ALTER TABLE employees ADD COLUMN hireDate TEXT DEFAULT ''"); } catch(e) {}
+  try { db.run("ALTER TABLE employees ADD COLUMN venue TEXT DEFAULT 'Кафе'"); } catch(e) {}
 
   // Начальные должности
   const posCount = dbGet('SELECT COUNT(*) as c FROM positions');
@@ -122,16 +123,16 @@ app.get('/api/employees', (req, res) => {
 });
 
 app.post('/api/employees', (req, res) => {
-  const { name, dob, position, payType, hireDate, phone, bank, card } = req.body;
-  const r = dbRun('INSERT INTO employees (name, dob, position, payType, hireDate, phone, bank, card) VALUES (?,?,?,?,?,?,?,?)',
-    [name, dob, position, payType || 'weekly', hireDate || new Date().toISOString().slice(0,10), phone || '', bank || '', card || '']);
+  const { name, dob, position, payType, venue, hireDate, phone, bank, card } = req.body;
+  const r = dbRun('INSERT INTO employees (name, dob, position, payType, venue, hireDate, phone, bank, card) VALUES (?,?,?,?,?,?,?,?,?)',
+    [name, dob, position, payType || 'weekly', venue || 'Кафе', hireDate || new Date().toISOString().slice(0,10), phone || '', bank || '', card || '']);
   res.json({ id: r.lastId });
 });
 
 app.put('/api/employees/:id', (req, res) => {
-  const { name, dob, position, payType, hireDate, phone, bank, card } = req.body;
-  dbRun('UPDATE employees SET name=?, dob=?, position=?, payType=?, hireDate=?, phone=?, bank=?, card=? WHERE id=?',
-    [name, dob, position, payType || 'weekly', hireDate || '', phone || '', bank || '', card || '', Number(req.params.id)]);
+  const { name, dob, position, payType, venue, hireDate, phone, bank, card } = req.body;
+  dbRun('UPDATE employees SET name=?, dob=?, position=?, payType=?, venue=?, hireDate=?, phone=?, bank=?, card=? WHERE id=?',
+    [name, dob, position, payType || 'weekly', venue || 'Кафе', hireDate || '', phone || '', bank || '', card || '', Number(req.params.id)]);
   res.json({ ok: true });
 });
 
