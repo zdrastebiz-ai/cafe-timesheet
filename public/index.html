@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Кафе — Табель сотрудников</title>
+<style>
+:root {
+  --primary: #2c3e50;
+  --accent: #e67e22;
+  --green: #27ae60;
+  --red: #e74c3c;
+  --bg: #f5f6fa;
+  --card: #fff;
+  --text: #2c3e50;
+  --border: #dcdde1;
+  --radius: 10px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* Header */
+.header {
+  background: var(--primary);
+  color: #fff;
+  padding: 16px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.header h1 { font-size: 1.3rem; font-weight: 600; }
+.header-nav { display: flex; gap: 8px; }
+.header-nav button {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.3);
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+.header-nav button:hover { background: rgba(255,255,255,0.25); }
+.header-nav button.active { background: var(--accent); border-color: var(--accent); }
+
+/* Pages */
+.page { display: none; padding: 24px; max-width: 900px; margin: 0 auto; }
+.page.active { display: block; }
+
+/* Cards */
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+.card h2 { font-size: 1.1rem; margin-bottom: 12px; color: var(--primary); }
+
+/* Employee list */
+.employee-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.emp-card {
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  text-align: center;
+  transition: all 0.2s;
+  cursor: default;
+}
+.emp-card.on-shift { border-color: var(--green); background: #eafaf1; }
+.emp-card .emp-name { font-weight: 600; font-size: 1rem; margin-bottom: 4px; }
+.emp-card .emp-position { font-size: 0.85rem; color: #7f8c8d; margin-bottom: 10px; }
+.emp-card .emp-time { font-size: 0.8rem; color: #95a5a6; margin-bottom: 10px; }
+.emp-card button {
+  padding: 8px 20px; border: none; border-radius: var(--radius);
+  font-size: 0.9rem; cursor: pointer; color: #fff; transition: opacity 0.2s;
+}
+.emp-card button:hover { opacity: 0.85; }
+.btn-start { background: var(--green); }
+.btn-end { background: var(--red); }
+
+/* Forms */
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 0.9rem; margin-bottom: 4px; font-weight: 500; }
+.form-group input, .form-group select {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius); font-size: 0.95rem; outline: none;
+}
+.form-group input:focus, .form-group select:focus { border-color: var(--accent); }
+.btn {
+  padding: 10px 24px; border: none; border-radius: var(--radius);
+  font-size: 0.95rem; cursor: pointer; color: #fff;
+  background: var(--accent); transition: opacity 0.2s;
+}
+.btn:hover { opacity: 0.85; }
+.btn-secondary { background: var(--primary); }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+th { background: var(--bg); font-weight: 600; position: sticky; top: 0; }
+tr:hover { background: #fafafa; }
+
+/* Modal */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.4); z-index: 100;
+  justify-content: center; align-items: center;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+  background: var(--card); border-radius: var(--radius); padding: 24px;
+  width: 90%; max-width: 420px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.modal h3 { margin-bottom: 16px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+/* Calendar */
+.calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.calendar-header button { background: none; border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 14px; cursor: pointer; font-size: 1rem; }
+.calendar-header button:hover { background: var(--bg); }
+.calendar-header .cal-title { font-weight: 600; font-size: 1rem; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-weekday { text-align: center; font-size: 0.75rem; font-weight: 600; color: #7f8c8d; padding: 6px 0; }
+.cal-day {
+  text-align: center; padding: 8px 4px; border-radius: 8px; font-size: 0.85rem;
+  min-height: 52px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px;
+}
+.cal-day.empty { background: none; }
+.cal-day.today { border: 2px solid var(--accent); }
+.cal-day.has-shift { background: #eafaf1; cursor: pointer; }
+.cal-day.has-shift:hover { background: #d5f5e3; }
+.cal-day .cal-num { font-weight: 600; font-size: 0.9rem; }
+.cal-day .cal-hours { font-size: 0.7rem; color: var(--green); font-weight: 600; }
+.cal-month-total { margin-top: 12px; padding: 10px; background: var(--bg); border-radius: var(--radius); font-size: 0.9rem; text-align: center; }
+
+/* Report */
+.report-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 16px; }
+.report-controls .form-group { margin-bottom: 0; }
+.total-row { font-weight: 700; background: #fef9e7 !important; }
+
+/* Print */
+@media print {
+  .header, .header-nav, .report-controls, .btn, button { display: none !important; }
+  .page { display: none !important; }
+  .page.print-active { display: block !important; padding: 0; }
+  .card { box-shadow: none; border: 1px solid #ccc; }
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .header { flex-direction: column; gap: 8px; }
+  .employee-grid { grid-template-columns: 1fr; }
+  .report-controls { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Кафе — Учёт смен</h1>
+  <div class="header-nav">
+    <button class="active" onclick="showPage('shifts')">Смены</button>
+    <button onclick="showPage('admin')">Админка</button>
+  </div>
+</div>
+
+<!-- ============ ПУБЛИЧНАЯ СТРАНИЦА: СМЕНЫ ============ -->
+<div id="page-shifts" class="page active">
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <h2>Сотрудники</h2>
+      <button class="btn" onclick="openAddEmployee()">+ Новый сотрудник</button>
+    </div>
+    <div id="employee-grid" class="employee-grid">
+      <p style="color:#95a5a6">Нет сотрудников. Добавьте первого.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Мои смены — календарь</h2>
+    <div class="form-group" style="max-width:280px;margin-bottom:12px">
+      <label>Выберите сотрудника</label>
+      <select id="cal-employee" onchange="renderCalendar()"></select>
+    </div>
+    <div id="calendar-container" style="display:none">
+      <div class="calendar-header">
+        <button onclick="calPrevMonth()">&larr;</button>
+        <span class="cal-title" id="cal-month-title"></span>
+        <button onclick="calNextMonth()">&rarr;</button>
+      </div>
+      <div class="calendar-grid" id="cal-grid"></div>
+      <div class="cal-month-total" id="cal-month-total"></div>
+      <div id="cal-day-detail" style="margin-top:10px;display:none"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Сегодняшние смены</h2>
+    <div id="today-shifts" style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Сотрудник</th><th>Должность</th><th>Начало</th><th>Конец</th><th>Часы</th></tr></thead>
+        <tbody id="today-shifts-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ============ АДМИНКА ============ -->
+<div id="page-admin" class="page">
+  <div id="admin-login" class="card">
+    <h2>Вход в админку</h2>
+    <div class="form-group">
+      <label>Пароль</label>
+      <input type="password" id="admin-pass" placeholder="Введите пароль" onkeydown="if(event.key==='Enter') loginAdmin()">
+    </div>
+    <button class="btn" onclick="loginAdmin()">Войти</button>
+    <p style="font-size:0.8rem;color:#95a5a6;margin-top:8px">Пароль по умолчанию: admin</p>
+  </div>
+
+  <div id="admin-panel" style="display:none">
+    <!-- Управление сотрудниками -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h2 style="margin-bottom:0">Управление сотрудниками</h2>
+        <button class="btn" onclick="openAdminAddEmployee()">+ Новый сотрудник</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>ФИО</th><th>Должность</th><th>Дата рождения</th><th>Выплата</th><th>Реквизиты</th><th>Ставка/час</th><th>Действия</th></tr></thead>
+          <tbody id="admin-employees-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Должности -->
+    <div class="card">
+      <h2>Должности</h2>
+      <div id="positions-list" style="margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="new-position" placeholder="Новая должность" style="flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius)">
+        <button class="btn" onclick="addPosition()">Добавить</button>
+      </div>
+    </div>
+
+    <!-- Отчёты -->
+    <div class="card">
+      <h2>Отчёты по зарплате</h2>
+      <div class="report-controls">
+        <div class="form-group">
+          <label>Тип отчёта</label>
+          <select id="report-type" onchange="toggleReportDates()">
+            <option value="weekly">Еженедельный</option>
+            <option value="bimonthly">Полумесячный (10 и 25)</option>
+            <option value="custom">За произвольный период (все сотрудники)</option>
+          </select>
+        </div>
+        <div class="form-group" id="report-week-group">
+          <label>Понедельник начала недели</label>
+          <input type="date" id="report-week-start">
+        </div>
+        <div class="form-group" id="report-half-group" style="display:none">
+          <label>Тип выплаты</label>
+          <select id="report-half">
+            <option value="advance">Аванс (25-го числа) — за 1–14</option>
+            <option value="remainder">Остаток (10-го числа) — за 15–конец месяца</option>
+          </select>
+        </div>
+        <div class="form-group" id="report-month-group" style="display:none">
+          <label>Месяц расчёта</label>
+          <input type="month" id="report-month">
+        </div>
+        <div class="form-group" id="report-custom-from" style="display:none">
+          <label>Дата начала</label>
+          <input type="date" id="report-date-from">
+        </div>
+        <div class="form-group" id="report-custom-to" style="display:none">
+          <label>Дата окончания</label>
+          <input type="date" id="report-date-to">
+        </div>
+        <button class="btn btn-secondary" onclick="generateReport()">Сформировать</button>
+        <button class="btn" onclick="printReport()">Печать</button>
+        <button class="btn" style="background:var(--green)" onclick="exportExcel()">Excel</button>
+        <button class="btn" style="background:#3498db" onclick="emailReport()">Отправить на почту</button>
+      </div>
+      <div id="report-result" style="overflow-x:auto"></div>
+    </div>
+
+    <!-- Настройки email -->
+    <div class="card">
+      <h2>Настройки email-отчётов</h2>
+      <p style="font-size:0.85rem;color:#7f8c8d;margin-bottom:12px">Отчёты отправляются автоматически: Пн — еженедельный, 25-го — аванс, 10-го — остаток, 1-го — полный за месяц</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label>SMTP сервер</label>
+          <input type="text" id="smtp-host" placeholder="smtp.mail.ru">
+        </div>
+        <div class="form-group">
+          <label>Порт</label>
+          <input type="number" id="smtp-port" placeholder="587">
+        </div>
+        <div class="form-group">
+          <label>Email (логин SMTP)</label>
+          <input type="email" id="smtp-user" placeholder="your@mail.ru">
+        </div>
+        <div class="form-group">
+          <label>Пароль SMTP</label>
+          <input type="password" id="smtp-pass">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Отправлять отчёты на</label>
+        <input type="email" id="email-to" placeholder="rv87@bk.ru">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="saveEmailSettings()">Сохранить</button>
+        <button class="btn btn-secondary" onclick="testEmail()">Тестовое письмо</button>
+      </div>
+      <div id="email-status" style="margin-top:8px;font-size:0.85rem"></div>
+    </div>
+
+    <!-- Смена пароля -->
+    <div class="card">
+      <h2>Сменить пароль админки</h2>
+      <div class="form-group">
+        <label>Новый пароль</label>
+        <input type="password" id="new-admin-pass">
+      </div>
+      <button class="btn" onclick="changeAdminPass()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ МОДАЛКА: СОТРУДНИК ============ -->
+<div class="modal-overlay" id="modal-add-employee">
+  <div class="modal">
+    <h3 id="emp-modal-title">Новый сотрудник</h3>
+    <input type="hidden" id="emp-edit-id" value="">
+    <div class="form-group">
+      <label>ФИО</label>
+      <input type="text" id="emp-name" placeholder="Иванов Иван Иванович">
+    </div>
+    <div class="form-group">
+      <label>Дата рождения</label>
+      <input type="date" id="emp-dob">
+    </div>
+    <div class="form-group">
+      <label>Должность</label>
+      <select id="emp-position"></select>
+    </div>
+    <div class="form-group">
+      <label>Тип выплаты</label>
+      <select id="emp-pay-type">
+        <option value="weekly">Еженедельно (каждый понедельник)</option>
+        <option value="bimonthly">2 раза в месяц (10 и 25 числа)</option>
+      </select>
+    </div>
+    <div id="emp-requisites" style="display:none">
+      <hr style="margin:14px 0;border:none;border-top:1px solid var(--border)">
+      <p style="font-size:0.85rem;color:#7f8c8d;margin-bottom:10px">Реквизиты для выплат</p>
+      <div class="form-group">
+        <label>Телефон</label>
+        <input type="tel" id="emp-phone" placeholder="+7 (900) 123-45-67">
+      </div>
+      <div class="form-group">
+        <label>Банк</label>
+        <input type="text" id="emp-bank" placeholder="Сбербанк">
+      </div>
+      <div class="form-group">
+        <label>Номер карты</label>
+        <input type="text" id="emp-card" placeholder="0000 0000 0000 0000" maxlength="19" oninput="formatCardNumber(this)">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-add-employee')">Отмена</button>
+      <button class="btn" onclick="saveEmployee()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ МОДАЛКА: СТАВКА ============ -->
+<div class="modal-overlay" id="modal-set-rate">
+  <div class="modal">
+    <h3>Назначить ставку</h3>
+    <input type="hidden" id="rate-emp-id">
+    <div class="form-group">
+      <label>Ставка за час (руб.)</label>
+      <input type="number" id="rate-value" min="0" step="10" placeholder="300">
+    </div>
+    <div class="form-group">
+      <label>Действует с</label>
+      <input type="date" id="rate-from">
+    </div>
+    <div id="rate-history" style="margin-top:8px;font-size:0.85rem;color:#7f8c8d"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-set-rate')">Отмена</button>
+      <button class="btn" onclick="saveRate()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== API HELPERS ====================
+const api = {
+  get: (url) => fetch(url).then(r => r.json()),
+  post: (url, data) => fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) }).then(r => r.json()),
+  put: (url, data) => fetch(url, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) }).then(r => r.json()),
+  del: (url) => fetch(url, { method: 'DELETE' }).then(r => r.json()),
+};
+
+// ==================== UTILS ====================
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+function nowStr() { return new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); }
+function formatDate(d) { return new Date(d).toLocaleDateString('ru-RU'); }
+function formatHours(minutes) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h + 'ч ' + (m < 10 ? '0' : '') + m + 'м';
+}
+function parseTime(str) { const [h, m] = str.split(':').map(Number); return h * 60 + m; }
+function minutesBetween(start, end) { return parseTime(end) - parseTime(start); }
+
+// ==================== PAGE NAVIGATION ====================
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active', 'print-active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.querySelectorAll('.header-nav button').forEach((b, i) => {
+    b.classList.toggle('active', (i === 0 && name === 'shifts') || (i === 1 && name === 'admin'));
+  });
+  if (name === 'shifts') { renderEmployees(); renderTodayShifts(); populateCalEmployeeSelect(); }
+}
+
+// ==================== MODAL ====================
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+// ==================== POSITIONS ====================
+async function renderPositionSelect() {
+  const positions = await api.get('/api/positions');
+  document.getElementById('emp-position').innerHTML = positions.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+}
+
+async function renderPositionsList() {
+  const positions = await api.get('/api/positions');
+  const el = document.getElementById('positions-list');
+  if (!el) return;
+  el.innerHTML = positions.map(p =>
+    `<span style="display:inline-block;background:var(--bg);padding:6px 12px;border-radius:20px;margin:3px;font-size:0.85rem">${p.name} <span style="cursor:pointer;color:var(--red);margin-left:4px" onclick="removePosition(${p.id})">&times;</span></span>`
+  ).join('');
+}
+
+async function addPosition() {
+  const input = document.getElementById('new-position');
+  const name = input.value.trim();
+  if (!name) return;
+  await api.post('/api/positions', { name });
+  input.value = '';
+  renderPositionsList();
+}
+
+async function removePosition(id) {
+  await api.del('/api/positions/' + id);
+  renderPositionsList();
+}
+
+// ==================== EMPLOYEES ====================
+async function renderEmployees() {
+  const employees = await api.get('/api/employees');
+  const shifts = await api.get('/api/shifts?date=' + todayStr());
+  const grid = document.getElementById('employee-grid');
+
+  if (employees.length === 0) {
+    grid.innerHTML = '<p style="color:#95a5a6">Нет сотрудников. Добавьте первого.</p>';
+    return;
+  }
+
+  grid.innerHTML = employees.map(emp => {
+    const activeShift = shifts.find(s => s.employeeId === emp.id && !s.endTime);
+    const isOnShift = !!activeShift;
+    return `
+      <div class="emp-card ${isOnShift ? 'on-shift' : ''}">
+        <div class="emp-name">${emp.name}</div>
+        <div class="emp-position">${emp.position}</div>
+        ${isOnShift ? `<div class="emp-time">С ${activeShift.startTime}</div>` : ''}
+        ${isOnShift
+          ? `<button class="btn-end" onclick="endShift(${activeShift.id})">Закрыть смену</button>`
+          : `<button class="btn-start" onclick="startShift(${emp.id})">На смене</button>`
+        }
+      </div>`;
+  }).join('');
+}
+
+async function startShift(employeeId) {
+  const res = await fetch('/api/shifts', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ employeeId, date: todayStr(), startTime: nowStr() })
+  });
+  if (!res.ok) { const e = await res.json(); alert(e.error); return; }
+  renderEmployees();
+  renderTodayShifts();
+}
+
+async function endShift(shiftId) {
+  await api.put('/api/shifts/' + shiftId + '/end', { endTime: nowStr() });
+  renderEmployees();
+  renderTodayShifts();
+}
+
+async function renderTodayShifts() {
+  const employees = await api.get('/api/employees');
+  const shifts = await api.get('/api/shifts?date=' + todayStr());
+  const tbody = document.getElementById('today-shifts-body');
+
+  if (shifts.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:#95a5a6;text-align:center">Нет смен за сегодня</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = shifts.map(s => {
+    const emp = employees.find(e => e.id === s.employeeId);
+    const mins = s.endTime ? minutesBetween(s.startTime, s.endTime) : null;
+    return `<tr>
+      <td>${emp ? emp.name : '—'}</td>
+      <td>${emp ? emp.position : '—'}</td>
+      <td>${s.startTime}</td>
+      <td>${s.endTime || '<em>на смене</em>'}</td>
+      <td>${mins !== null ? formatHours(mins) : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ==================== CALENDAR ====================
+let calYear, calMonth;
+(function() { const n = new Date(); calYear = n.getFullYear(); calMonth = n.getMonth(); })();
+
+function calPrevMonth() { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); }
+function calNextMonth() { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } renderCalendar(); }
+
+async function populateCalEmployeeSelect() {
+  const employees = await api.get('/api/employees');
+  const sel = document.getElementById('cal-employee');
+  sel.innerHTML = '<option value="">— выберите —</option>' +
+    employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+}
+
+const WEEKDAYS_SHORT = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+const MONTH_NAMES = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+async function renderCalendar() {
+  const empId = Number(document.getElementById('cal-employee').value);
+  const container = document.getElementById('calendar-container');
+  if (!empId) { container.style.display = 'none'; return; }
+  container.style.display = '';
+
+  const from = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-01`;
+  const lastDay = new Date(calYear, calMonth + 1, 0).getDate();
+  const to = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${lastDay}`;
+  const shifts = await api.get(`/api/shifts/range?from=${from}&to=${to}&employeeId=${empId}`);
+
+  const dayMap = {};
+  shifts.forEach(s => {
+    const mins = minutesBetween(s.startTime, s.endTime);
+    if (mins > 0) dayMap[s.date] = (dayMap[s.date] || 0) + mins;
+  });
+
+  document.getElementById('cal-month-title').textContent = `${MONTH_NAMES[calMonth]} ${calYear}`;
+
+  const firstDay = new Date(calYear, calMonth, 1);
+  const daysInMonth = lastDay;
+  let startWeekday = firstDay.getDay() - 1;
+  if (startWeekday < 0) startWeekday = 6;
+
+  const todayISO = todayStr();
+  let html = WEEKDAYS_SHORT.map(d => `<div class="cal-weekday">${d}</div>`).join('');
+  for (let i = 0; i < startWeekday; i++) html += '<div class="cal-day empty"></div>';
+
+  let totalMonthMins = 0, totalDays = 0;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const mins = dayMap[dateStr] || 0;
+    const isToday = dateStr === todayISO;
+    const hasShift = mins > 0;
+    if (hasShift) { totalMonthMins += mins; totalDays++; }
+
+    let classes = 'cal-day';
+    if (isToday) classes += ' today';
+    if (hasShift) classes += ' has-shift';
+
+    html += `<div class="${classes}" ${hasShift ? `onclick="showCalDayDetail('${dateStr}', ${empId})"` : ''}>
+      <span class="cal-num">${d}</span>
+      ${hasShift ? `<span class="cal-hours">${formatHours(mins)}</span>` : ''}
+    </div>`;
+  }
+
+  document.getElementById('cal-grid').innerHTML = html;
+  document.getElementById('cal-month-total').innerHTML =
+    `За ${MONTH_NAMES[calMonth].toLowerCase()}: <strong>${totalDays}</strong> дн. / <strong>${formatHours(totalMonthMins)}</strong>`;
+  document.getElementById('cal-day-detail').style.display = 'none';
+}
+
+async function showCalDayDetail(dateStr, empId) {
+  const shifts = await api.get(`/api/shifts/range?from=${dateStr}&to=${dateStr}&employeeId=${empId}`);
+  const el = document.getElementById('cal-day-detail');
+  if (shifts.length === 0) { el.style.display = 'none'; return; }
+
+  let totalMins = 0;
+  const rows = shifts.map(s => {
+    const mins = minutesBetween(s.startTime, s.endTime);
+    totalMins += mins;
+    return `<tr><td>${s.startTime}</td><td>${s.endTime}</td><td>${formatHours(mins)}</td></tr>`;
+  }).join('');
+
+  el.style.display = '';
+  el.innerHTML = `<strong>${formatDate(dateStr)}</strong>
+    <table style="margin-top:6px">
+      <thead><tr><th>Начало</th><th>Конец</th><th>Часы</th></tr></thead>
+      <tbody>${rows}<tr class="total-row"><td colspan="2">Итого</td><td>${formatHours(totalMins)}</td></tr></tbody>
+    </table>`;
+}
+
+// ==================== ADD / EDIT EMPLOYEE ====================
+let employeeEditSource = 'public';
+
+function clearRequisites() {
+  document.getElementById('emp-phone').value = '';
+  document.getElementById('emp-bank').value = '';
+  document.getElementById('emp-card').value = '';
+}
+function showRequisites(show) { document.getElementById('emp-requisites').style.display = show ? '' : 'none'; }
+function formatCardNumber(input) {
+  let v = input.value.replace(/\D/g, '').slice(0, 16);
+  input.value = v.replace(/(\d{4})(?=\d)/g, '$1 ');
+}
+function maskCard(card) {
+  if (!card) return '';
+  const digits = card.replace(/\D/g, '');
+  if (digits.length < 8) return card;
+  return '**** **** **** ' + digits.slice(-4);
+}
+
+async function openAddEmployee() {
+  employeeEditSource = 'public';
+  await renderPositionSelect();
+  document.getElementById('emp-modal-title').textContent = 'Новый сотрудник';
+  document.getElementById('emp-edit-id').value = '';
+  document.getElementById('emp-name').value = '';
+  document.getElementById('emp-dob').value = '';
+  document.getElementById('emp-pay-type').value = 'weekly';
+  clearRequisites();
+  showRequisites(false);
+  openModal('modal-add-employee');
+}
+
+async function openAdminAddEmployee() {
+  employeeEditSource = 'admin';
+  await renderPositionSelect();
+  document.getElementById('emp-modal-title').textContent = 'Новый сотрудник';
+  document.getElementById('emp-edit-id').value = '';
+  document.getElementById('emp-name').value = '';
+  document.getElementById('emp-dob').value = '';
+  document.getElementById('emp-pay-type').value = 'weekly';
+  clearRequisites();
+  showRequisites(true);
+  openModal('modal-add-employee');
+}
+
+async function openEditEmployee(empId) {
+  employeeEditSource = 'admin';
+  const employees = await api.get('/api/employees');
+  const emp = employees.find(e => e.id === empId);
+  if (!emp) return;
+  await renderPositionSelect();
+  document.getElementById('emp-modal-title').textContent = 'Редактирование сотрудника';
+  document.getElementById('emp-edit-id').value = empId;
+  document.getElementById('emp-name').value = emp.name;
+  document.getElementById('emp-dob').value = emp.dob;
+  document.getElementById('emp-pay-type').value = emp.payType || 'weekly';
+  document.getElementById('emp-phone').value = emp.phone || '';
+  document.getElementById('emp-bank').value = emp.bank || '';
+  document.getElementById('emp-card').value = emp.card || '';
+  showRequisites(true);
+  const sel = document.getElementById('emp-position');
+  sel.value = emp.position;
+  if (!sel.value) {
+    const opt = document.createElement('option');
+    opt.value = emp.position; opt.textContent = emp.position;
+    sel.appendChild(opt); sel.value = emp.position;
+  }
+  openModal('modal-add-employee');
+}
+
+async function saveEmployee() {
+  const editId = document.getElementById('emp-edit-id').value;
+  const name = document.getElementById('emp-name').value.trim();
+  const dob = document.getElementById('emp-dob').value;
+  const position = document.getElementById('emp-position').value;
+  const payType = document.getElementById('emp-pay-type').value;
+  const phone = document.getElementById('emp-phone').value.trim();
+  const bank = document.getElementById('emp-bank').value.trim();
+  const card = document.getElementById('emp-card').value.trim();
+
+  if (!name) { alert('Введите ФИО'); return; }
+  if (!dob) { alert('Введите дату рождения'); return; }
+  if (!position) { alert('Выберите должность'); return; }
+
+  const data = { name, dob, position, payType, phone, bank, card };
+
+  if (editId) {
+    await api.put('/api/employees/' + editId, data);
+  } else {
+    await api.post('/api/employees', data);
+  }
+
+  closeModal('modal-add-employee');
+  renderEmployees();
+  if (employeeEditSource === 'admin') renderAdminEmployees();
+}
+
+// ==================== ADMIN ====================
+async function loginAdmin() {
+  const input = document.getElementById('admin-pass').value;
+  const stored = await api.get('/api/settings/adminPassword');
+  if (input === stored.value) {
+    document.getElementById('admin-login').style.display = 'none';
+    document.getElementById('admin-panel').style.display = 'block';
+    renderAdminEmployees();
+    renderPositionsList();
+    loadEmailSettings();
+    setDefaultReportDates();
+  } else {
+    alert('Неверный пароль');
+  }
+}
+
+async function changeAdminPass() {
+  const newPass = document.getElementById('new-admin-pass').value;
+  if (!newPass || newPass.length < 3) { alert('Пароль слишком короткий'); return; }
+  await api.put('/api/settings/adminPassword', { value: newPass });
+  alert('Пароль изменён');
+  document.getElementById('new-admin-pass').value = '';
+}
+
+async function renderAdminEmployees() {
+  const employees = await api.get('/api/employees');
+  const rates = await api.get('/api/rates');
+  const tbody = document.getElementById('admin-employees-body');
+
+  if (employees.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:#95a5a6;text-align:center">Нет сотрудников</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = employees.map(emp => {
+    const empRates = rates.filter(r => r.employeeId === emp.id).sort((a, b) => b.fromDate.localeCompare(a.fromDate));
+    const currentRate = empRates.length > 0 ? empRates[0] : null;
+    const hasReq = emp.phone || emp.bank || emp.card;
+    const reqHtml = hasReq
+      ? [emp.phone, emp.bank, emp.card ? maskCard(emp.card) : ''].filter(Boolean).join('<br>')
+      : '<span style="color:#95a5a6">—</span>';
+    const payTypeLabel = (emp.payType || 'weekly') === 'weekly'
+      ? '<span style="color:var(--accent)">Еженед.</span>'
+      : '<span style="color:var(--primary)">10 и 25</span>';
+    return `<tr>
+      <td>${emp.name}</td>
+      <td>${emp.position}</td>
+      <td>${formatDate(emp.dob)}</td>
+      <td>${payTypeLabel}</td>
+      <td style="font-size:0.83rem">${reqHtml}</td>
+      <td>${currentRate ? currentRate.rate + ' руб/ч' : '<span style="color:var(--red)">не задана</span>'}
+        ${currentRate ? '<br><small style="color:#95a5a6">с ' + formatDate(currentRate.fromDate) + '</small>' : ''}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-secondary" style="padding:5px 12px;font-size:0.8rem" onclick="openEditEmployee(${emp.id})">Ред.</button>
+        <button class="btn" style="padding:5px 12px;font-size:0.8rem" onclick="openSetRate(${emp.id})">Ставка</button>
+        <button class="btn btn-secondary" style="padding:5px 12px;font-size:0.8rem;background:var(--red)" onclick="deleteEmployee(${emp.id})">Удалить</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function deleteEmployee(id) {
+  if (!confirm('Удалить сотрудника?')) return;
+  await api.del('/api/employees/' + id);
+  renderAdminEmployees();
+  renderEmployees();
+}
+
+// ==================== RATES ====================
+async function openSetRate(empId) {
+  document.getElementById('rate-emp-id').value = empId;
+  document.getElementById('rate-value').value = '';
+  document.getElementById('rate-from').value = todayStr();
+
+  const rates = await api.get('/api/rates');
+  const empRates = rates.filter(r => r.employeeId === empId).sort((a, b) => b.fromDate.localeCompare(a.fromDate));
+  const historyEl = document.getElementById('rate-history');
+  historyEl.innerHTML = empRates.length > 0
+    ? '<strong>История ставок:</strong><br>' + empRates.map(r => `${r.rate} руб/ч — с ${formatDate(r.fromDate)}`).join('<br>')
+    : '<em>Ставка ещё не задана</em>';
+
+  openModal('modal-set-rate');
+}
+
+async function saveRate() {
+  const empId = Number(document.getElementById('rate-emp-id').value);
+  const rate = Number(document.getElementById('rate-value').value);
+  const fromDate = document.getElementById('rate-from').value;
+  if (!rate || rate <= 0) { alert('Введите ставку'); return; }
+  if (!fromDate) { alert('Укажите дату начала действия'); return; }
+
+  await api.post('/api/rates', { employeeId: empId, rate, fromDate });
+  closeModal('modal-set-rate');
+  renderAdminEmployees();
+}
+
+// ==================== REPORTS ====================
+function toggleReportDates() {
+  const type = document.getElementById('report-type').value;
+  document.getElementById('report-week-group').style.display = type === 'weekly' ? '' : 'none';
+  document.getElementById('report-half-group').style.display = type === 'bimonthly' ? '' : 'none';
+  document.getElementById('report-month-group').style.display = type === 'bimonthly' ? '' : 'none';
+  document.getElementById('report-custom-from').style.display = type === 'custom' ? '' : 'none';
+  document.getElementById('report-custom-to').style.display = type === 'custom' ? '' : 'none';
+  setDefaultReportDates();
+}
+
+function setDefaultReportDates() {
+  const today = new Date();
+  const type = document.getElementById('report-type').value;
+
+  if (type === 'weekly') {
+    const prevMonday = new Date(today);
+    const day = today.getDay();
+    const diff = day === 0 ? 6 : day - 1;
+    prevMonday.setDate(today.getDate() - diff - 7);
+    document.getElementById('report-week-start').value = prevMonday.toISOString().slice(0, 10);
+  } else if (type === 'bimonthly') {
+    const dayOfMonth = today.getDate();
+    const halfSel = document.getElementById('report-half');
+    const monthInput = document.getElementById('report-month');
+    if (dayOfMonth >= 20) {
+      halfSel.value = 'advance';
+      monthInput.value = today.toISOString().slice(0, 7);
+    } else {
+      halfSel.value = 'remainder';
+      const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      monthInput.value = prevMonth.toISOString().slice(0, 7);
+    }
+  } else if (type === 'custom') {
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    document.getElementById('report-date-from').value = firstDay.toISOString().slice(0, 10);
+    document.getElementById('report-date-to').value = today.toISOString().slice(0, 10);
+  }
+}
+
+function getLastDayOfMonth(year, month) { return new Date(year, month, 0).getDate(); }
+
+function getMonthName(m) {
+  return ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'][m - 1];
+}
+
+// Текущие параметры отчёта (для отправки на почту)
+let lastReportParams = null;
+
+async function generateReport() {
+  const type = document.getElementById('report-type').value;
+  let startDate, endDate, title, payType;
+
+  if (type === 'weekly') {
+    startDate = document.getElementById('report-week-start').value;
+    if (!startDate) { alert('Укажите понедельник начала недели'); return; }
+    const end = new Date(startDate); end.setDate(end.getDate() + 6);
+    endDate = end.toISOString().slice(0, 10);
+    title = `Еженедельный отчёт: ${formatDate(startDate)} — ${formatDate(endDate)}`;
+    payType = 'weekly';
+  } else if (type === 'custom') {
+    startDate = document.getElementById('report-date-from').value;
+    endDate = document.getElementById('report-date-to').value;
+    if (!startDate || !endDate) { alert('Укажите даты'); return; }
+    if (startDate > endDate) { alert('Дата начала позже окончания'); return; }
+    title = `Отчёт за период: ${formatDate(startDate)} — ${formatDate(endDate)} (все сотрудники)`;
+    payType = null;
+  } else {
+    const month = document.getElementById('report-month').value;
+    if (!month) { alert('Укажите месяц'); return; }
+    const half = document.getElementById('report-half').value;
+    const [year, mon] = month.split('-').map(Number);
+    const lastDay = getLastDayOfMonth(year, mon);
+    if (half === 'advance') {
+      startDate = `${month}-01`; endDate = `${month}-14`;
+      title = `Аванс (выплата 25-го): 1–14 ${getMonthName(mon)} ${year}`;
+    } else {
+      startDate = `${month}-15`; endDate = `${month}-${lastDay}`;
+      title = `Остаток зарплаты (выплата 10-го): 15–${lastDay} ${getMonthName(mon)} ${year}`;
+    }
+    payType = 'bimonthly';
+  }
+
+  let url = `/api/report?from=${startDate}&to=${endDate}`;
+  if (payType) url += `&payType=${payType}`;
+  const report = await api.get(url);
+
+  lastReportParams = { type, from: startDate, to: endDate, title };
+
+  const resultEl = document.getElementById('report-result');
+  resultEl.innerHTML = `
+    <h3 style="margin-bottom:12px">${title}</h3>
+    <table>
+      <thead><tr><th>ФИО</th><th>Должность</th><th>Дней</th><th>Часов</th><th>Ставка</th><th>К выплате</th></tr></thead>
+      <tbody>
+        ${report.rows.map(r => `<tr>
+          <td>${r.name}</td>
+          <td>${r.position}</td>
+          <td>${r.daysWorked}</td>
+          <td>${formatHours(r.totalMinutes)}</td>
+          <td>${r.daysWorked > 0 ? r.currentRate + ' руб/ч' : '—'}</td>
+          <td><strong>${r.totalPay.toLocaleString('ru-RU')} руб.</strong></td>
+        </tr>`).join('')}
+        <tr class="total-row">
+          <td colspan="5">ИТОГО</td>
+          <td><strong>${report.grandTotal.toLocaleString('ru-RU')} руб.</strong></td>
+        </tr>
+      </tbody>
+    </table>`;
+}
+
+function printReport() {
+  const adminPage = document.getElementById('page-admin');
+  adminPage.classList.add('print-active');
+  window.print();
+  adminPage.classList.remove('print-active');
+}
+
+function exportExcel() {
+  const resultEl = document.getElementById('report-result');
+  const table = resultEl.querySelector('table');
+  if (!table) { alert('Сначала сформируйте отчёт'); return; }
+  const h3 = resultEl.querySelector('h3');
+  const title = h3 ? h3.textContent : 'Отчёт';
+
+  const rows = [];
+  table.querySelectorAll('tr').forEach(tr => {
+    const row = [];
+    tr.querySelectorAll('th, td').forEach(cell => row.push(cell.textContent.trim()));
+    rows.push(row);
+  });
+
+  let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<?mso-application progid="Excel.Sheet"?>\n';
+  xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
+  xml += '<Styles>\n  <Style ss:ID="header"><Font ss:Bold="1" ss:Size="11"/><Interior ss:Color="#F5F6FA" ss:Pattern="Solid"/></Style>\n';
+  xml += '  <Style ss:ID="title"><Font ss:Bold="1" ss:Size="14"/></Style>\n';
+  xml += '  <Style ss:ID="total"><Font ss:Bold="1" ss:Size="11"/><Interior ss:Color="#FEF9E7" ss:Pattern="Solid"/></Style>\n';
+  xml += '  <Style ss:ID="default"><Font ss:Size="11"/></Style>\n</Styles>\n';
+  xml += `<Worksheet ss:Name="Отчёт">\n<Table>\n`;
+  xml += '<Column ss:Width="200"/><Column ss:Width="120"/><Column ss:Width="60"/><Column ss:Width="80"/><Column ss:Width="80"/><Column ss:Width="120"/>\n';
+  xml += `<Row><Cell ss:StyleID="title"><Data ss:Type="String">${escapeXml(title)}</Data></Cell></Row>\n<Row></Row>\n`;
+
+  rows.forEach((row, idx) => {
+    const style = idx === 0 ? 'header' : (idx === rows.length - 1 ? 'total' : 'default');
+    xml += '<Row>' + row.map(cell => `<Cell ss:StyleID="${style}"><Data ss:Type="String">${escapeXml(cell)}</Data></Cell>`).join('') + '</Row>\n';
+  });
+
+  xml += '</Table>\n</Worksheet>\n</Workbook>';
+  const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  a.download = title.replace(/[^a-zA-Zа-яА-ЯёЁ0-9\s\-]/g, '').trim().replace(/\s+/g, '_') + '.xls';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function escapeXml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+async function emailReport() {
+  if (!lastReportParams) { alert('Сначала сформируйте отчёт'); return; }
+  const res = await fetch('/api/send-report', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(lastReportParams)
+  });
+  const data = await res.json();
+  if (res.ok) {
+    alert('Отчёт отправлен на почту!');
+  } else {
+    alert('Ошибка: ' + (data.error || 'Не удалось отправить'));
+  }
+}
+
+// ==================== EMAIL SETTINGS ====================
+async function loadEmailSettings() {
+  const [host, port, user, pass, to] = await Promise.all([
+    api.get('/api/settings/smtpHost'),
+    api.get('/api/settings/smtpPort'),
+    api.get('/api/settings/smtpUser'),
+    api.get('/api/settings/smtpPass'),
+    api.get('/api/settings/emailTo'),
+  ]);
+  document.getElementById('smtp-host').value = host.value || '';
+  document.getElementById('smtp-port').value = port.value || '587';
+  document.getElementById('smtp-user').value = user.value || '';
+  document.getElementById('smtp-pass').value = pass.value || '';
+  document.getElementById('email-to').value = to.value || 'rv87@bk.ru';
+}
+
+async function saveEmailSettings() {
+  await Promise.all([
+    api.put('/api/settings/smtpHost', { value: document.getElementById('smtp-host').value }),
+    api.put('/api/settings/smtpPort', { value: document.getElementById('smtp-port').value }),
+    api.put('/api/settings/smtpUser', { value: document.getElementById('smtp-user').value }),
+    api.put('/api/settings/smtpPass', { value: document.getElementById('smtp-pass').value }),
+    api.put('/api/settings/emailTo', { value: document.getElementById('email-to').value }),
+  ]);
+  document.getElementById('email-status').innerHTML = '<span style="color:var(--green)">Настройки сохранены</span>';
+  setTimeout(() => document.getElementById('email-status').innerHTML = '', 3000);
+}
+
+async function testEmail() {
+  document.getElementById('email-status').innerHTML = '<span style="color:var(--accent)">Отправка...</span>';
+  const res = await fetch('/api/test-email', { method: 'POST' });
+  const data = await res.json();
+  if (res.ok) {
+    document.getElementById('email-status').innerHTML = '<span style="color:var(--green)">Тестовое письмо отправлено!</span>';
+  } else {
+    document.getElementById('email-status').innerHTML = `<span style="color:var(--red)">Ошибка: ${data.error}</span>`;
+  }
+}
+
+// ==================== INIT ====================
+(async function init() {
+  renderEmployees();
+  renderTodayShifts();
+  populateCalEmployeeSelect();
+})();
+</script>
+</body>
+</html>

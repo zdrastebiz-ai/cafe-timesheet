@@ -1,0 +1,16 @@
+{
+  "name": "cafe-timesheet",
+  "version": "2.0.0",
+  "description": "Табель учёта рабочего времени и расчёт зарплаты для кафе",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "sql.js": "^1.11.0",
+    "express": "^4.21.0",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.0"
+  }
+}
