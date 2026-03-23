@@ -263,7 +263,7 @@ tr:hover { background: #fafafa; }
       </div>
       <div style="overflow-x:auto">
         <table>
-          <thead><tr><th>ФИО</th><th>Должность</th><th>Дата рождения</th><th>Реквизиты</th><th>Ставка/час</th><th>Действия</th></tr></thead>
+          <thead><tr><th>ФИО</th><th>Должность</th><th>Дата рождения</th><th>Выплата</th><th>Реквизиты</th><th>Ставка/час</th><th>Действия</th></tr></thead>
           <tbody id="admin-employees-body"></tbody>
         </table>
       </div>
@@ -339,6 +339,13 @@ tr:hover { background: #fafafa; }
     <div class="form-group">
       <label>Должность</label>
       <select id="emp-position"></select>
+    </div>
+    <div class="form-group">
+      <label>Тип выплаты</label>
+      <select id="emp-pay-type">
+        <option value="weekly">Еженедельно (каждый понедельник)</option>
+        <option value="bimonthly">2 раза в месяц (10 и 25 числа)</option>
+      </select>
     </div>
     <div id="emp-requisites" style="display:none">
       <hr style="margin:14px 0;border:none;border-top:1px solid var(--border)">
@@ -767,6 +774,7 @@ async function openAddEmployee() {
   document.getElementById('emp-edit-id').value = '';
   document.getElementById('emp-name').value = '';
   document.getElementById('emp-dob').value = '';
+  document.getElementById('emp-pay-type').value = 'weekly';
   clearRequisites();
   showRequisites(false);
   openModal('modal-add-employee');
@@ -779,6 +787,7 @@ async function openAdminAddEmployee() {
   document.getElementById('emp-edit-id').value = '';
   document.getElementById('emp-name').value = '';
   document.getElementById('emp-dob').value = '';
+  document.getElementById('emp-pay-type').value = 'weekly';
   clearRequisites();
   showRequisites(true);
   openModal('modal-add-employee');
@@ -793,6 +802,7 @@ async function openEditEmployee(empId) {
   document.getElementById('emp-edit-id').value = empId;
   document.getElementById('emp-name').value = emp.name;
   document.getElementById('emp-dob').value = emp.dob;
+  document.getElementById('emp-pay-type').value = emp.payType || 'weekly';
   document.getElementById('emp-phone').value = emp.phone || '';
   document.getElementById('emp-bank').value = emp.bank || '';
   document.getElementById('emp-card').value = emp.card || '';
@@ -814,6 +824,7 @@ async function saveEmployee() {
   const name = document.getElementById('emp-name').value.trim();
   const dob = document.getElementById('emp-dob').value;
   const position = document.getElementById('emp-position').value;
+  const payType = document.getElementById('emp-pay-type').value;
   const phone = document.getElementById('emp-phone').value.trim();
   const bank = document.getElementById('emp-bank').value.trim();
   const card = document.getElementById('emp-card').value.trim();
@@ -827,12 +838,13 @@ async function saveEmployee() {
     emp.name = name;
     emp.dob = dob;
     emp.position = position;
+    emp.payType = payType;
     emp.phone = phone;
     emp.bank = bank;
     emp.card = card;
     await dbPut('employees', emp);
   } else {
-    await dbAdd('employees', { name, dob, position, phone, bank, card });
+    await dbAdd('employees', { name, dob, position, payType, phone, bank, card });
   }
 
   closeModal('modal-add-employee');
@@ -879,7 +891,7 @@ async function renderAdminEmployees() {
   const tbody = document.getElementById('admin-employees-body');
 
   if (employees.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="color:#95a5a6;text-align:center">Нет сотрудников</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="color:#95a5a6;text-align:center">Нет сотрудников</td></tr>';
     return;
   }
 
@@ -890,10 +902,14 @@ async function renderAdminEmployees() {
     const reqHtml = hasReq
       ? [emp.phone, emp.bank, emp.card ? maskCard(emp.card) : ''].filter(Boolean).join('<br>')
       : '<span style="color:#95a5a6">—</span>';
+    const payTypeLabel = (emp.payType || 'weekly') === 'weekly'
+      ? '<span style="color:var(--accent)">Еженед.</span>'
+      : '<span style="color:var(--primary)">10 и 25</span>';
     return `<tr>
       <td>${emp.name}</td>
       <td>${emp.position}</td>
       <td>${formatDate(emp.dob)}</td>
+      <td>${payTypeLabel}</td>
       <td style="font-size:0.83rem">${reqHtml}</td>
       <td>${currentRate ? currentRate.rate + ' руб/ч' : '<span style="color:var(--red)">не задана</span>'}
         ${currentRate ? '<br><small style="color:#95a5a6">с ' + formatDate(currentRate.fromDate) + '</small>' : ''}</td>
@@ -999,9 +1015,13 @@ function getLastDayOfMonth(year, month) {
 
 async function generateReport() {
   const type = document.getElementById('report-type').value;
-  const employees = await dbGetAll('employees');
+  const allEmployees = await dbGetAll('employees');
   const shifts = await dbGetAll('shifts');
   const rates = await dbGetAll('rates');
+
+  // Фильтруем сотрудников по типу выплаты
+  const payFilter = type === 'weekly' ? 'weekly' : 'bimonthly';
+  const employees = allEmployees.filter(e => (e.payType || 'weekly') === payFilter);
 
   let startDate, endDate, title;
 
