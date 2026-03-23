@@ -291,19 +291,19 @@ tr:hover { background: #fafafa; }
           </select>
         </div>
         <div class="form-group" id="report-week-group">
-          <label>Неделя (начало)</label>
+          <label>Понедельник начала недели</label>
           <input type="date" id="report-week-start">
         </div>
-        <div class="form-group" id="report-month-group" style="display:none">
-          <label>Месяц</label>
-          <input type="month" id="report-month">
-        </div>
         <div class="form-group" id="report-half-group" style="display:none">
-          <label>Период</label>
+          <label>Тип выплаты</label>
           <select id="report-half">
-            <option value="first">1–10 (первая половина)</option>
-            <option value="second">11–25 (вторая половина)</option>
+            <option value="advance">Аванс (25-го числа) — за 1–14</option>
+            <option value="remainder">Остаток (10-го числа) — за 15–конец месяца</option>
           </select>
+        </div>
+        <div class="form-group" id="report-month-group" style="display:none">
+          <label>Месяц расчёта</label>
+          <input type="month" id="report-month">
         </div>
         <button class="btn btn-secondary" onclick="generateReport()">Сформировать</button>
         <button class="btn" onclick="printReport()">Печать</button>
@@ -859,11 +859,7 @@ async function loginAdmin() {
     renderAdminEmployees();
     renderPositionsList();
     // Set default dates
-    const today = new Date();
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1));
-    document.getElementById('report-week-start').value = monday.toISOString().slice(0, 10);
-    document.getElementById('report-month').value = today.toISOString().slice(0, 7);
+    setDefaultReportDates();
   } else {
     alert('Неверный пароль');
   }
@@ -961,8 +957,44 @@ function getRateForDate(rates, empId, dateStr) {
 function toggleReportDates() {
   const type = document.getElementById('report-type').value;
   document.getElementById('report-week-group').style.display = type === 'weekly' ? '' : 'none';
-  document.getElementById('report-month-group').style.display = type === 'bimonthly' ? '' : 'none';
   document.getElementById('report-half-group').style.display = type === 'bimonthly' ? '' : 'none';
+  document.getElementById('report-month-group').style.display = type === 'bimonthly' ? '' : 'none';
+  setDefaultReportDates();
+}
+
+function setDefaultReportDates() {
+  const today = new Date();
+  const type = document.getElementById('report-type').value;
+
+  if (type === 'weekly') {
+    // Еженедельный: по умолчанию — предыдущий понедельник (прошлая неделя)
+    const prevMonday = new Date(today);
+    const day = today.getDay();
+    const diff = day === 0 ? 6 : day - 1; // дней до понедельника текущей недели
+    prevMonday.setDate(today.getDate() - diff - 7); // минус ещё 7 = прошлый понедельник
+    document.getElementById('report-week-start').value = prevMonday.toISOString().slice(0, 10);
+  } else {
+    // Полумесячный: определяем по текущей дате
+    const dayOfMonth = today.getDate();
+    const halfSel = document.getElementById('report-half');
+    const monthInput = document.getElementById('report-month');
+
+    if (dayOfMonth >= 20) {
+      // Ближе к 25-му — аванс за текущий месяц (1–14)
+      halfSel.value = 'advance';
+      monthInput.value = today.toISOString().slice(0, 7);
+    } else {
+      // Ближе к 10-му — остаток за предыдущий месяц (15–конец)
+      halfSel.value = 'remainder';
+      const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      monthInput.value = prevMonth.toISOString().slice(0, 7);
+    }
+  }
+}
+
+function getLastDayOfMonth(year, month) {
+  // month: 1-based
+  return new Date(year, month, 0).getDate();
 }
 
 async function generateReport() {
@@ -975,22 +1007,28 @@ async function generateReport() {
 
   if (type === 'weekly') {
     startDate = document.getElementById('report-week-start').value;
+    if (!startDate) { alert('Укажите понедельник начала недели'); return; }
     const end = new Date(startDate);
     end.setDate(end.getDate() + 6);
     endDate = end.toISOString().slice(0, 10);
     title = `Еженедельный отчёт: ${formatDate(startDate)} — ${formatDate(endDate)}`;
   } else {
     const month = document.getElementById('report-month').value;
+    if (!month) { alert('Укажите месяц'); return; }
     const half = document.getElementById('report-half').value;
     const [year, mon] = month.split('-').map(Number);
-    if (half === 'first') {
+    const lastDay = getLastDayOfMonth(year, mon);
+
+    if (half === 'advance') {
+      // Аванс 25-го: за 1–14 число текущего месяца
       startDate = `${month}-01`;
-      endDate = `${month}-10`;
-      title = `Зарплата за 1–10 ${getMonthName(mon)} ${year}`;
+      endDate = `${month}-14`;
+      title = `Аванс (выплата 25-го): 1–14 ${getMonthName(mon)} ${year}`;
     } else {
-      startDate = `${month}-11`;
-      endDate = `${month}-25`;
-      title = `Зарплата за 11–25 ${getMonthName(mon)} ${year}`;
+      // Остаток 10-го: за 15–конец предыдущего месяца
+      startDate = `${month}-15`;
+      endDate = `${month}-${lastDay}`;
+      title = `Остаток зарплаты (выплата 10-го): 15–${lastDay} ${getMonthName(mon)} ${year}`;
     }
   }
 
@@ -1002,21 +1040,18 @@ async function generateReport() {
     let totalPay = 0;
     let daysWorked = 0;
 
-    const dayDetails = [];
     empShifts.forEach(s => {
       const mins = minutesBetween(s.startTime, s.endTime);
       if (mins > 0) {
         totalMinutes += mins;
         daysWorked++;
         const rate = getRateForDate(rates, emp.id, s.date);
-        const pay = (mins / 60) * rate;
-        totalPay += pay;
-        dayDetails.push({ date: s.date, mins, rate, pay });
+        totalPay += (mins / 60) * rate;
       }
     });
 
-    return { emp, totalMinutes, totalPay: Math.round(totalPay), daysWorked, dayDetails };
-  }).filter(r => r.daysWorked > 0 || true);
+    return { emp, totalMinutes, totalPay: Math.round(totalPay), daysWorked };
+  });
 
   let grandTotal = rows.reduce((sum, r) => sum + r.totalPay, 0);
 
@@ -1033,7 +1068,7 @@ async function generateReport() {
           <td>${r.emp.position}</td>
           <td>${r.daysWorked}</td>
           <td>${formatHours(r.totalMinutes)}</td>
-          <td>${r.dayDetails.length > 0 ? getRateForDate(rates, r.emp.id, endDate) + ' руб/ч' : '—'}</td>
+          <td>${r.daysWorked > 0 ? getRateForDate(rates, r.emp.id, endDate) + ' руб/ч' : '—'}</td>
           <td><strong>${r.totalPay.toLocaleString('ru-RU')} руб.</strong></td>
         </tr>`).join('')}
         <tr class="total-row">
