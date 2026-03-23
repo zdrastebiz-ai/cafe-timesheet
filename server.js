@@ -2,8 +2,13 @@ const express = require('express');
 const initSqlJs = require('sql.js');
 const fs = require('fs');
 const path = require('path');
+const dns = require('dns');
 const cron = require('node-cron');
 const nodemailer = require('nodemailer');
+
+// Использовать системный DNS resolver вместо встроенного в Node.js
+dns.setDefaultResultOrder('ipv4first');
+dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 
 const app = express();
 const PORT = 3000;
