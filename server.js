@@ -79,6 +79,11 @@ async function initDatabase() {
     id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL
   )`);
   db.run(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
+  db.run(`CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL, message TEXT NOT NULL,
+    createdAt TEXT NOT NULL, readAt TEXT
+  )`);
 
   // Миграция: добавить hireDate если нет
   try { db.run("ALTER TABLE employees ADD COLUMN hireDate TEXT DEFAULT ''"); } catch(e) {}
@@ -353,6 +358,57 @@ app.post('/api/send-report', async (req, res) => {
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ==================== API: NOTIFICATIONS ====================
+app.get('/api/notifications', (req, res) => {
+  res.json(dbAll('SELECT * FROM notifications ORDER BY createdAt DESC LIMIT 50'));
+});
+
+app.get('/api/notifications/unread', (req, res) => {
+  res.json(dbAll("SELECT * FROM notifications WHERE readAt IS NULL ORDER BY createdAt DESC"));
+});
+
+app.put('/api/notifications/:id/read', (req, res) => {
+  dbRun('UPDATE notifications SET readAt=? WHERE id=?', [new Date().toISOString(), Number(req.params.id)]);
+  res.json({ ok: true });
+});
+
+app.put('/api/notifications/read-all', (req, res) => {
+  dbRun("UPDATE notifications SET readAt=? WHERE readAt IS NULL", [new Date().toISOString()]);
+  res.json({ ok: true });
+});
+
+// ==================== AUTO-CLOSE SHIFTS ====================
+const MAX_SHIFT_HOURS = 12;
+
+function autoCloseShifts() {
+  const openShifts = dbAll('SELECT s.*, e.name as empName FROM shifts s JOIN employees e ON e.id = s.employeeId WHERE s.endTime IS NULL');
+  const now = new Date();
+
+  openShifts.forEach(s => {
+    const shiftStart = new Date(`${s.date}T${s.startTime}:00`);
+    const hoursOpen = (now - shiftStart) / (1000 * 60 * 60);
+
+    if (hoursOpen >= MAX_SHIFT_HOURS) {
+      // Закрываем через 12 часов от начала
+      const autoEnd = new Date(shiftStart.getTime() + MAX_SHIFT_HOURS * 60 * 60 * 1000);
+      const endTimeStr = `${String(autoEnd.getHours()).padStart(2,'0')}:${String(autoEnd.getMinutes()).padStart(2,'0')}`;
+
+      dbRun('UPDATE shifts SET endTime=? WHERE id=?', [endTimeStr, s.id]);
+
+      const nowStr = now.toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      const msg = `Автозакрытие смены: ${s.empName}, дата ${s.date}, начало ${s.startTime}, закрыта в ${endTimeStr} (макс. ${MAX_SHIFT_HOURS}ч). Обнаружено: ${nowStr}`;
+
+      dbRun("INSERT INTO notifications (type, message, createdAt) VALUES (?,?,?)",
+        ['auto_close', msg, new Date().toISOString()]);
+
+      console.log('[AutoClose]', msg);
+    }
+  });
+}
+
+// Каждые 10 минут — проверка и автозакрытие смен
+cron.schedule('*/10 * * * *', () => { autoCloseShifts(); });
+
 // ==================== CRON JOBS ====================
 function getMonthName(m) {
   return ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'][m - 1];
@@ -400,5 +456,7 @@ initDatabase().then(() => {
     console.log('  25-го 08:00 — аванс (1–14)');
     console.log('  10-го 08:00 — остаток (15–конец пред. месяца)');
     console.log('  1-го 08:00 — полный за пред. месяц (все)');
+    console.log('  Каждые 10 мин — автозакрытие смен (макс. 12ч)');
+    autoCloseShifts(); // проверить при старте
   });
 }).catch(err => { console.error('Ошибка инициализации БД:', err); process.exit(1); });

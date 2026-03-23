@@ -149,6 +149,13 @@ tr:hover { background: #fafafa; }
   .card { box-shadow: none; border: 1px solid #ccc; }
 }
 
+/* Notifications */
+.notif-item {
+  padding: 10px 12px; border-radius: var(--radius); margin-bottom: 6px;
+  background: #fef9e7; font-size: 0.88rem; display: flex; justify-content: space-between; align-items: center; gap: 8px;
+}
+.notif-item.read { background: var(--bg); color: #95a5a6; }
+
 /* Responsive */
 @media (max-width: 600px) {
   .header { flex-direction: column; gap: 8px; }
@@ -221,6 +228,15 @@ tr:hover { background: #fafafa; }
   </div>
 
   <div id="admin-panel" style="display:none">
+    <!-- Уведомления -->
+    <div id="notifications-card" class="card" style="display:none;border-left:4px solid var(--red)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h2 style="margin-bottom:0;color:var(--red)">Уведомления <span id="notif-count" style="background:var(--red);color:#fff;border-radius:50%;padding:2px 8px;font-size:0.8rem"></span></h2>
+        <button class="btn btn-secondary" style="padding:5px 14px;font-size:0.8rem" onclick="markAllRead()">Прочитать все</button>
+      </div>
+      <div id="notifications-list"></div>
+    </div>
+
     <!-- Управление сотрудниками -->
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
@@ -812,6 +828,7 @@ async function loginAdmin() {
     renderAdminEmployees();
     renderPositionsList();
     populateAdminCalSelect();
+    loadNotifications();
     loadEmailSettings();
     setDefaultReportDates();
   } else {
@@ -899,6 +916,38 @@ async function saveRate() {
   await api.post('/api/rates', { employeeId: empId, rate, fromDate });
   closeModal('modal-set-rate');
   renderAdminEmployees();
+}
+
+// ==================== NOTIFICATIONS ====================
+async function loadNotifications() {
+  const notifs = await api.get('/api/notifications/unread');
+  const card = document.getElementById('notifications-card');
+  const list = document.getElementById('notifications-list');
+  const count = document.getElementById('notif-count');
+
+  if (notifs.length === 0) {
+    card.style.display = 'none';
+    return;
+  }
+
+  card.style.display = '';
+  count.textContent = notifs.length;
+  list.innerHTML = notifs.map(n => `
+    <div class="notif-item">
+      <span>${n.message}</span>
+      <button onclick="markRead(${n.id})" style="background:none;border:none;cursor:pointer;color:var(--green);font-size:1.1rem" title="Прочитано">✓</button>
+    </div>
+  `).join('');
+}
+
+async function markRead(id) {
+  await api.put('/api/notifications/' + id + '/read', {});
+  loadNotifications();
+}
+
+async function markAllRead() {
+  await api.put('/api/notifications/read-all', {});
+  loadNotifications();
 }
 
 // ==================== ADMIN CALENDAR ====================
