@@ -288,6 +288,7 @@ tr:hover { background: #fafafa; }
           <select id="report-type" onchange="toggleReportDates()">
             <option value="weekly">Еженедельный</option>
             <option value="bimonthly">Полумесячный (10 и 25)</option>
+            <option value="custom">За произвольный период (все сотрудники)</option>
           </select>
         </div>
         <div class="form-group" id="report-week-group">
@@ -304,6 +305,14 @@ tr:hover { background: #fafafa; }
         <div class="form-group" id="report-month-group" style="display:none">
           <label>Месяц расчёта</label>
           <input type="month" id="report-month">
+        </div>
+        <div class="form-group" id="report-custom-from" style="display:none">
+          <label>Дата начала</label>
+          <input type="date" id="report-date-from">
+        </div>
+        <div class="form-group" id="report-custom-to" style="display:none">
+          <label>Дата окончания</label>
+          <input type="date" id="report-date-to">
         </div>
         <button class="btn btn-secondary" onclick="generateReport()">Сформировать</button>
         <button class="btn" onclick="printReport()">Печать</button>
@@ -976,6 +985,8 @@ function toggleReportDates() {
   document.getElementById('report-week-group').style.display = type === 'weekly' ? '' : 'none';
   document.getElementById('report-half-group').style.display = type === 'bimonthly' ? '' : 'none';
   document.getElementById('report-month-group').style.display = type === 'bimonthly' ? '' : 'none';
+  document.getElementById('report-custom-from').style.display = type === 'custom' ? '' : 'none';
+  document.getElementById('report-custom-to').style.display = type === 'custom' ? '' : 'none';
   setDefaultReportDates();
 }
 
@@ -984,28 +995,29 @@ function setDefaultReportDates() {
   const type = document.getElementById('report-type').value;
 
   if (type === 'weekly') {
-    // Еженедельный: по умолчанию — предыдущий понедельник (прошлая неделя)
     const prevMonday = new Date(today);
     const day = today.getDay();
-    const diff = day === 0 ? 6 : day - 1; // дней до понедельника текущей недели
-    prevMonday.setDate(today.getDate() - diff - 7); // минус ещё 7 = прошлый понедельник
+    const diff = day === 0 ? 6 : day - 1;
+    prevMonday.setDate(today.getDate() - diff - 7);
     document.getElementById('report-week-start').value = prevMonday.toISOString().slice(0, 10);
-  } else {
-    // Полумесячный: определяем по текущей дате
+  } else if (type === 'bimonthly') {
     const dayOfMonth = today.getDate();
     const halfSel = document.getElementById('report-half');
     const monthInput = document.getElementById('report-month');
 
     if (dayOfMonth >= 20) {
-      // Ближе к 25-му — аванс за текущий месяц (1–14)
       halfSel.value = 'advance';
       monthInput.value = today.toISOString().slice(0, 7);
     } else {
-      // Ближе к 10-му — остаток за предыдущий месяц (15–конец)
       halfSel.value = 'remainder';
       const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       monthInput.value = prevMonth.toISOString().slice(0, 7);
     }
+  } else if (type === 'custom') {
+    // За произвольный период: по умолчанию — текущий месяц
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    document.getElementById('report-date-from').value = firstDay.toISOString().slice(0, 10);
+    document.getElementById('report-date-to').value = today.toISOString().slice(0, 10);
   }
 }
 
@@ -1020,9 +1032,14 @@ async function generateReport() {
   const shifts = await dbGetAll('shifts');
   const rates = await dbGetAll('rates');
 
-  // Фильтруем сотрудников по типу выплаты
-  const payFilter = type === 'weekly' ? 'weekly' : 'bimonthly';
-  const employees = allEmployees.filter(e => (e.payType || 'weekly') === payFilter);
+  // Фильтруем сотрудников по типу выплаты (custom — все)
+  let employees;
+  if (type === 'custom') {
+    employees = allEmployees;
+  } else {
+    const payFilter = type === 'weekly' ? 'weekly' : 'bimonthly';
+    employees = allEmployees.filter(e => (e.payType || 'weekly') === payFilter);
+  }
 
   let startDate, endDate, title;
 
@@ -1033,6 +1050,12 @@ async function generateReport() {
     end.setDate(end.getDate() + 6);
     endDate = end.toISOString().slice(0, 10);
     title = `Еженедельный отчёт: ${formatDate(startDate)} — ${formatDate(endDate)}`;
+  } else if (type === 'custom') {
+    startDate = document.getElementById('report-date-from').value;
+    endDate = document.getElementById('report-date-to').value;
+    if (!startDate || !endDate) { alert('Укажите даты начала и окончания периода'); return; }
+    if (startDate > endDate) { alert('Дата начала не может быть позже даты окончания'); return; }
+    title = `Отчёт за период: ${formatDate(startDate)} — ${formatDate(endDate)} (все сотрудники)`;
   } else {
     const month = document.getElementById('report-month').value;
     if (!month) { alert('Укажите месяц'); return; }
@@ -1041,7 +1064,6 @@ async function generateReport() {
     const lastDay = getLastDayOfMonth(year, mon);
 
     if (half === 'advance') {
-      // Аванс 25-го: за 1–14 число текущего месяца
       startDate = `${month}-01`;
       endDate = `${month}-14`;
       title = `Аванс (выплата 25-го): 1–14 ${getMonthName(mon)} ${year}`;
