@@ -229,7 +229,7 @@ tr:hover { background: #fafafa; }
       </div>
       <div style="overflow-x:auto">
         <table>
-          <thead><tr><th>ФИО</th><th>Должность</th><th>Дата рождения</th><th>Выплата</th><th>Реквизиты</th><th>Ставка/час</th><th>Действия</th></tr></thead>
+          <thead><tr><th>ФИО</th><th>Должность</th><th>Дата рождения</th><th>Дата приёма</th><th>Выплата</th><th>Реквизиты</th><th>Ставка/час</th><th>Действия</th></tr></thead>
           <tbody id="admin-employees-body"></tbody>
         </table>
       </div>
@@ -356,6 +356,12 @@ tr:hover { background: #fafafa; }
         <option value="weekly">Еженедельно (каждый понедельник)</option>
         <option value="bimonthly">2 раза в месяц (10 и 25 числа)</option>
       </select>
+    </div>
+    <div id="emp-hire-group" style="display:none">
+      <div class="form-group">
+        <label>Дата приёма на работу</label>
+        <input type="date" id="emp-hire-date">
+      </div>
     </div>
     <div id="emp-requisites" style="display:none">
       <hr style="margin:14px 0;border:none;border-top:1px solid var(--border)">
@@ -630,7 +636,10 @@ function clearRequisites() {
   document.getElementById('emp-bank').value = '';
   document.getElementById('emp-card').value = '';
 }
-function showRequisites(show) { document.getElementById('emp-requisites').style.display = show ? '' : 'none'; }
+function showAdminFields(show) {
+  document.getElementById('emp-requisites').style.display = show ? '' : 'none';
+  document.getElementById('emp-hire-group').style.display = show ? '' : 'none';
+}
 function formatCardNumber(input) {
   let v = input.value.replace(/\D/g, '').slice(0, 16);
   input.value = v.replace(/(\d{4})(?=\d)/g, '$1 ');
@@ -650,8 +659,9 @@ async function openAddEmployee() {
   document.getElementById('emp-name').value = '';
   document.getElementById('emp-dob').value = '';
   document.getElementById('emp-pay-type').value = 'weekly';
+  document.getElementById('emp-hire-date').value = '';
   clearRequisites();
-  showRequisites(false);
+  showAdminFields(false);
   openModal('modal-add-employee');
 }
 
@@ -663,8 +673,9 @@ async function openAdminAddEmployee() {
   document.getElementById('emp-name').value = '';
   document.getElementById('emp-dob').value = '';
   document.getElementById('emp-pay-type').value = 'weekly';
+  document.getElementById('emp-hire-date').value = todayStr();
   clearRequisites();
-  showRequisites(true);
+  showAdminFields(true);
   openModal('modal-add-employee');
 }
 
@@ -679,10 +690,11 @@ async function openEditEmployee(empId) {
   document.getElementById('emp-name').value = emp.name;
   document.getElementById('emp-dob').value = emp.dob;
   document.getElementById('emp-pay-type').value = emp.payType || 'weekly';
+  document.getElementById('emp-hire-date').value = emp.hireDate || '';
   document.getElementById('emp-phone').value = emp.phone || '';
   document.getElementById('emp-bank').value = emp.bank || '';
   document.getElementById('emp-card').value = emp.card || '';
-  showRequisites(true);
+  showAdminFields(true);
   const sel = document.getElementById('emp-position');
   sel.value = emp.position;
   if (!sel.value) {
@@ -699,6 +711,7 @@ async function saveEmployee() {
   const dob = document.getElementById('emp-dob').value;
   const position = document.getElementById('emp-position').value;
   const payType = document.getElementById('emp-pay-type').value;
+  const hireDate = document.getElementById('emp-hire-date').value;
   const phone = document.getElementById('emp-phone').value.trim();
   const bank = document.getElementById('emp-bank').value.trim();
   const card = document.getElementById('emp-card').value.trim();
@@ -707,7 +720,7 @@ async function saveEmployee() {
   if (!dob) { alert('Введите дату рождения'); return; }
   if (!position) { alert('Выберите должность'); return; }
 
-  const data = { name, dob, position, payType, phone, bank, card };
+  const data = { name, dob, position, payType, hireDate, phone, bank, card };
 
   if (editId) {
     await api.put('/api/employees/' + editId, data);
@@ -750,7 +763,7 @@ async function renderAdminEmployees() {
   const tbody = document.getElementById('admin-employees-body');
 
   if (employees.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="color:#95a5a6;text-align:center">Нет сотрудников</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="color:#95a5a6;text-align:center">Нет сотрудников</td></tr>';
     return;
   }
 
@@ -768,6 +781,7 @@ async function renderAdminEmployees() {
       <td>${emp.name}</td>
       <td>${emp.position}</td>
       <td>${formatDate(emp.dob)}</td>
+      <td>${emp.hireDate ? formatDate(emp.hireDate) : '<span style="color:#95a5a6">—</span>'}</td>
       <td>${payTypeLabel}</td>
       <td style="font-size:0.83rem">${reqHtml}</td>
       <td>${currentRate ? currentRate.rate + ' руб/ч' : '<span style="color:var(--red)">не задана</span>'}

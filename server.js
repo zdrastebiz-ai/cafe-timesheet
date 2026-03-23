@@ -6,9 +6,17 @@ const dns = require('dns');
 const cron = require('node-cron');
 const nodemailer = require('nodemailer');
 
-// Использовать системный DNS resolver вместо встроенного в Node.js
 dns.setDefaultResultOrder('ipv4first');
-dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+
+// Резолвим SMTP-хост через системный DNS (dns.lookup) перед подключением
+function resolveHost(hostname) {
+  return new Promise((resolve) => {
+    if (require('net').isIP(hostname)) return resolve(hostname);
+    dns.lookup(hostname, { family: 4 }, (err, address) => {
+      resolve(err ? hostname : address);
+    });
+  });
+}
 
 const app = express();
 const PORT = 3000;
@@ -56,7 +64,8 @@ async function initDatabase() {
   db.run(`CREATE TABLE IF NOT EXISTS employees (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL, dob TEXT NOT NULL, position TEXT NOT NULL,
-    payType TEXT DEFAULT 'weekly', phone TEXT DEFAULT '', bank TEXT DEFAULT '', card TEXT DEFAULT ''
+    payType TEXT DEFAULT 'weekly', hireDate TEXT DEFAULT '',
+    phone TEXT DEFAULT '', bank TEXT DEFAULT '', card TEXT DEFAULT ''
   )`);
   db.run(`CREATE TABLE IF NOT EXISTS shifts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,6 +79,9 @@ async function initDatabase() {
     id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL
   )`);
   db.run(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
+
+  // Миграция: добавить hireDate если нет
+  try { db.run("ALTER TABLE employees ADD COLUMN hireDate TEXT DEFAULT ''"); } catch(e) {}
 
   // Начальные должности
   const posCount = dbGet('SELECT COUNT(*) as c FROM positions');
@@ -110,16 +122,16 @@ app.get('/api/employees', (req, res) => {
 });
 
 app.post('/api/employees', (req, res) => {
-  const { name, dob, position, payType, phone, bank, card } = req.body;
-  const r = dbRun('INSERT INTO employees (name, dob, position, payType, phone, bank, card) VALUES (?,?,?,?,?,?,?)',
-    [name, dob, position, payType || 'weekly', phone || '', bank || '', card || '']);
+  const { name, dob, position, payType, hireDate, phone, bank, card } = req.body;
+  const r = dbRun('INSERT INTO employees (name, dob, position, payType, hireDate, phone, bank, card) VALUES (?,?,?,?,?,?,?,?)',
+    [name, dob, position, payType || 'weekly', hireDate || new Date().toISOString().slice(0,10), phone || '', bank || '', card || '']);
   res.json({ id: r.lastId });
 });
 
 app.put('/api/employees/:id', (req, res) => {
-  const { name, dob, position, payType, phone, bank, card } = req.body;
-  dbRun('UPDATE employees SET name=?, dob=?, position=?, payType=?, phone=?, bank=?, card=? WHERE id=?',
-    [name, dob, position, payType || 'weekly', phone || '', bank || '', card || '', Number(req.params.id)]);
+  const { name, dob, position, payType, hireDate, phone, bank, card } = req.body;
+  dbRun('UPDATE employees SET name=?, dob=?, position=?, payType=?, hireDate=?, phone=?, bank=?, card=? WHERE id=?',
+    [name, dob, position, payType || 'weekly', hireDate || '', phone || '', bank || '', card || '', Number(req.params.id)]);
   res.json({ ok: true });
 });
 
@@ -258,19 +270,23 @@ function getEmailConfig() {
   };
 }
 
-function createTransporter() {
+async function createTransporter() {
   const cfg = getEmailConfig();
   if (!cfg.host || !cfg.user || !cfg.pass) return null;
+  const resolvedHost = await resolveHost(cfg.host);
+  console.log(`[SMTP] Подключение к ${resolvedHost}:${cfg.port} (${cfg.host})`);
   return nodemailer.createTransport({
-    host: cfg.host,
+    host: resolvedHost,
     port: cfg.port,
     secure: cfg.port === 465,
+    requireTLS: cfg.port !== 465,
     auth: { user: cfg.user, pass: cfg.pass },
-    tls: { rejectUnauthorized: false },
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 15000,
-    dnsTimeout: 10000
+    tls: { rejectUnauthorized: false, servername: cfg.host },
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000,
+    logger: true,
+    debug: true
   });
 }
 
@@ -292,7 +308,7 @@ function reportToHtml(title, report) {
 }
 
 async function sendReportEmail(title, report) {
-  const transporter = createTransporter();
+  const transporter = await createTransporter();
   if (!transporter) { console.log('[Email] SMTP не настроен:', title); return; }
   const cfg = getEmailConfig();
   try {
@@ -302,7 +318,7 @@ async function sendReportEmail(title, report) {
 }
 
 app.post('/api/test-email', async (req, res) => {
-  const transporter = createTransporter();
+  const transporter = await createTransporter();
   if (!transporter) return res.status(400).json({ error: 'SMTP не настроен' });
   const cfg = getEmailConfig();
   try {
