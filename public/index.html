@@ -235,6 +235,26 @@ tr:hover { background: #fafafa; }
       </div>
     </div>
 
+    <!-- Календарь смен (админ) -->
+    <div class="card">
+      <h2>Календарь смен (редактирование)</h2>
+      <div class="form-group" style="max-width:280px;margin-bottom:12px">
+        <label>Сотрудник</label>
+        <select id="admin-cal-employee" onchange="renderAdminCalendar()">
+          <option value="">— выберите —</option>
+        </select>
+      </div>
+      <div id="admin-cal-container" style="display:none">
+        <div class="calendar-header">
+          <button onclick="adminCalPrev()">&larr;</button>
+          <span class="cal-title" id="admin-cal-title"></span>
+          <button onclick="adminCalNext()">&rarr;</button>
+        </div>
+        <div class="calendar-grid" id="admin-cal-grid"></div>
+        <div class="cal-month-total" id="admin-cal-total"></div>
+      </div>
+    </div>
+
     <!-- Должности -->
     <div class="card">
       <h2>Должности</h2>
@@ -403,6 +423,33 @@ tr:hover { background: #fafafa; }
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal('modal-set-rate')">Отмена</button>
       <button class="btn" onclick="saveRate()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ МОДАЛКА: РЕДАКТИРОВАНИЕ СМЕН ============ -->
+<div class="modal-overlay" id="modal-edit-shifts">
+  <div class="modal" style="max-width:500px">
+    <h3 id="edit-shifts-title">Смены за день</h3>
+    <input type="hidden" id="edit-shifts-emp-id">
+    <input type="hidden" id="edit-shifts-date">
+    <div id="edit-shifts-list"></div>
+    <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <p style="font-size:0.85rem;color:#7f8c8d;margin-bottom:8px">Добавить смену</p>
+      <div style="display:flex;gap:8px;align-items:end">
+        <div class="form-group" style="margin-bottom:0;flex:1">
+          <label>Начало</label>
+          <input type="time" id="new-shift-start">
+        </div>
+        <div class="form-group" style="margin-bottom:0;flex:1">
+          <label>Конец</label>
+          <input type="time" id="new-shift-end">
+        </div>
+        <button class="btn" style="padding:10px 16px" onclick="addManualShift()">+</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('modal-edit-shifts')">Закрыть</button>
     </div>
   </div>
 </div>
@@ -750,6 +797,7 @@ async function loginAdmin() {
     document.getElementById('admin-panel').style.display = 'block';
     renderAdminEmployees();
     renderPositionsList();
+    populateAdminCalSelect();
     loadEmailSettings();
     setDefaultReportDates();
   } else {
@@ -836,6 +884,139 @@ async function saveRate() {
   await api.post('/api/rates', { employeeId: empId, rate, fromDate });
   closeModal('modal-set-rate');
   renderAdminEmployees();
+}
+
+// ==================== ADMIN CALENDAR ====================
+let adminCalYear, adminCalMonth;
+(function() { const n = new Date(); adminCalYear = n.getFullYear(); adminCalMonth = n.getMonth(); })();
+
+function adminCalPrev() { adminCalMonth--; if (adminCalMonth < 0) { adminCalMonth = 11; adminCalYear--; } renderAdminCalendar(); }
+function adminCalNext() { adminCalMonth++; if (adminCalMonth > 11) { adminCalMonth = 0; adminCalYear++; } renderAdminCalendar(); }
+
+async function populateAdminCalSelect() {
+  const employees = await api.get('/api/employees');
+  const sel = document.getElementById('admin-cal-employee');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— выберите —</option>' +
+    employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+  if (cur) sel.value = cur;
+}
+
+async function renderAdminCalendar() {
+  const empId = Number(document.getElementById('admin-cal-employee').value);
+  const container = document.getElementById('admin-cal-container');
+  if (!empId) { container.style.display = 'none'; return; }
+  container.style.display = '';
+
+  const mm = String(adminCalMonth + 1).padStart(2, '0');
+  const from = `${adminCalYear}-${mm}-01`;
+  const daysInMonth = new Date(adminCalYear, adminCalMonth + 1, 0).getDate();
+  const to = `${adminCalYear}-${mm}-${daysInMonth}`;
+  const shifts = await api.get(`/api/shifts/range?from=${from}&to=${to}&employeeId=${empId}`);
+
+  const dayMap = {};
+  shifts.forEach(s => {
+    const mins = minutesBetween(s.startTime, s.endTime);
+    if (mins > 0) dayMap[s.date] = (dayMap[s.date] || 0) + mins;
+  });
+
+  document.getElementById('admin-cal-title').textContent = `${MONTH_NAMES[adminCalMonth]} ${adminCalYear}`;
+
+  const firstDay = new Date(adminCalYear, adminCalMonth, 1);
+  let startWeekday = firstDay.getDay() - 1;
+  if (startWeekday < 0) startWeekday = 6;
+  const todayISO = todayStr();
+
+  let html = WEEKDAYS_SHORT.map(d => `<div class="cal-weekday">${d}</div>`).join('');
+  for (let i = 0; i < startWeekday; i++) html += '<div class="cal-day empty"></div>';
+
+  let totalMins = 0, totalDays = 0;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${adminCalYear}-${mm}-${String(d).padStart(2, '0')}`;
+    const mins = dayMap[dateStr] || 0;
+    const isToday = dateStr === todayISO;
+    const hasShift = mins > 0;
+    if (hasShift) { totalMins += mins; totalDays++; }
+
+    let classes = 'cal-day has-shift';
+    if (isToday) classes += ' today';
+    if (!hasShift) classes = classes.replace('has-shift', '');
+
+    html += `<div class="${classes}" style="cursor:pointer" onclick="openEditShifts('${dateStr}', ${empId})">
+      <span class="cal-num">${d}</span>
+      ${hasShift ? `<span class="cal-hours">${formatHours(mins)}</span>` : '<span class="cal-hours" style="color:#ddd">+</span>'}
+    </div>`;
+  }
+
+  document.getElementById('admin-cal-grid').innerHTML = html;
+  document.getElementById('admin-cal-total').innerHTML =
+    `За ${MONTH_NAMES[adminCalMonth].toLowerCase()}: <strong>${totalDays}</strong> дн. / <strong>${formatHours(totalMins)}</strong>`;
+}
+
+async function openEditShifts(dateStr, empId) {
+  document.getElementById('edit-shifts-emp-id').value = empId;
+  document.getElementById('edit-shifts-date').value = dateStr;
+  document.getElementById('edit-shifts-title').textContent = `Смены: ${formatDate(dateStr)}`;
+  document.getElementById('new-shift-start').value = '09:00';
+  document.getElementById('new-shift-end').value = '18:00';
+  await renderEditShiftsList(dateStr, empId);
+  openModal('modal-edit-shifts');
+}
+
+async function renderEditShiftsList(dateStr, empId) {
+  const shifts = await api.get(`/api/shifts/range?from=${dateStr}&to=${dateStr}&employeeId=${empId}`);
+  // Также проверим открытые смены
+  const allShifts = await api.get(`/api/shifts?date=${dateStr}&employeeId=${empId}`);
+  const combined = allShifts;
+
+  const el = document.getElementById('edit-shifts-list');
+  if (combined.length === 0) {
+    el.innerHTML = '<p style="color:#95a5a6;font-size:0.9rem">Нет смен за этот день</p>';
+    return;
+  }
+
+  el.innerHTML = combined.map(s => {
+    const mins = s.endTime ? minutesBetween(s.startTime, s.endTime) : null;
+    return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;padding:8px;background:var(--bg);border-radius:var(--radius)">
+      <input type="time" value="${s.startTime}" onchange="updateShift(${s.id}, this.value, this.parentElement.querySelectorAll('input[type=time]')[1].value)" style="padding:6px;border:1px solid var(--border);border-radius:var(--radius)">
+      <span>—</span>
+      <input type="time" value="${s.endTime || ''}" onchange="updateShift(${s.id}, this.parentElement.querySelectorAll('input[type=time]')[0].value, this.value)" style="padding:6px;border:1px solid var(--border);border-radius:var(--radius)" ${!s.endTime ? 'placeholder="на смене"' : ''}>
+      <span style="font-size:0.85rem;color:var(--green);min-width:50px">${mins !== null ? formatHours(mins) : 'открыта'}</span>
+      <button onclick="deleteShift(${s.id})" style="background:var(--red);color:#fff;border:none;border-radius:var(--radius);padding:4px 10px;cursor:pointer;font-size:0.85rem">✕</button>
+    </div>`;
+  }).join('');
+}
+
+async function updateShift(shiftId, startTime, endTime) {
+  if (!startTime || !endTime) return;
+  await api.put('/api/shifts/' + shiftId, { startTime, endTime });
+  const dateStr = document.getElementById('edit-shifts-date').value;
+  const empId = Number(document.getElementById('edit-shifts-emp-id').value);
+  await renderEditShiftsList(dateStr, empId);
+  renderAdminCalendar();
+}
+
+async function deleteShift(shiftId) {
+  if (!confirm('Удалить эту смену?')) return;
+  await api.del('/api/shifts/' + shiftId);
+  const dateStr = document.getElementById('edit-shifts-date').value;
+  const empId = Number(document.getElementById('edit-shifts-emp-id').value);
+  await renderEditShiftsList(dateStr, empId);
+  renderAdminCalendar();
+}
+
+async function addManualShift() {
+  const empId = Number(document.getElementById('edit-shifts-emp-id').value);
+  const date = document.getElementById('edit-shifts-date').value;
+  const startTime = document.getElementById('new-shift-start').value;
+  const endTime = document.getElementById('new-shift-end').value;
+  if (!startTime || !endTime) { alert('Укажите начало и конец смены'); return; }
+  if (startTime >= endTime) { alert('Начало должно быть раньше конца'); return; }
+
+  await api.post('/api/shifts/manual', { employeeId: empId, date, startTime, endTime });
+  await renderEditShiftsList(date, empId);
+  renderAdminCalendar();
 }
 
 // ==================== REPORTS ====================

@@ -174,6 +174,24 @@ app.put('/api/shifts/:id/end', (req, res) => {
   res.json({ ok: true });
 });
 
+app.put('/api/shifts/:id', (req, res) => {
+  const { startTime, endTime } = req.body;
+  dbRun('UPDATE shifts SET startTime=?, endTime=? WHERE id=?', [startTime, endTime, Number(req.params.id)]);
+  res.json({ ok: true });
+});
+
+app.delete('/api/shifts/:id', (req, res) => {
+  dbRun('DELETE FROM shifts WHERE id=?', [Number(req.params.id)]);
+  res.json({ ok: true });
+});
+
+app.post('/api/shifts/manual', (req, res) => {
+  const { employeeId, date, startTime, endTime } = req.body;
+  const r = dbRun('INSERT INTO shifts (employeeId, date, startTime, endTime) VALUES (?,?,?,?)',
+    [employeeId, date, startTime, endTime]);
+  res.json({ id: r.lastId });
+});
+
 // ==================== API: RATES ====================
 app.get('/api/rates', (req, res) => {
   res.json(dbAll('SELECT * FROM rates ORDER BY fromDate DESC'));
