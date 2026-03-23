@@ -637,8 +637,10 @@ function clearRequisites() {
   document.getElementById('emp-card').value = '';
 }
 function showAdminFields(show) {
-  document.getElementById('emp-requisites').style.display = show ? '' : 'none';
   document.getElementById('emp-hire-group').style.display = show ? '' : 'none';
+}
+function showPayType(show) {
+  document.getElementById('emp-pay-type').closest('.form-group').style.display = show ? '' : 'none';
 }
 function formatCardNumber(input) {
   let v = input.value.replace(/\D/g, '').slice(0, 16);
@@ -661,7 +663,9 @@ async function openAddEmployee() {
   document.getElementById('emp-pay-type').value = 'weekly';
   document.getElementById('emp-hire-date').value = '';
   clearRequisites();
+  showPayType(false);
   showAdminFields(false);
+  document.getElementById('emp-requisites').style.display = '';
   openModal('modal-add-employee');
 }
 
@@ -675,7 +679,9 @@ async function openAdminAddEmployee() {
   document.getElementById('emp-pay-type').value = 'weekly';
   document.getElementById('emp-hire-date').value = todayStr();
   clearRequisites();
+  showPayType(true);
   showAdminFields(true);
+  document.getElementById('emp-requisites').style.display = '';
   openModal('modal-add-employee');
 }
 
@@ -694,7 +700,9 @@ async function openEditEmployee(empId) {
   document.getElementById('emp-phone').value = emp.phone || '';
   document.getElementById('emp-bank').value = emp.bank || '';
   document.getElementById('emp-card').value = emp.card || '';
+  showPayType(true);
   showAdminFields(true);
+  document.getElementById('emp-requisites').style.display = '';
   const sel = document.getElementById('emp-position');
   sel.value = emp.position;
   if (!sel.value) {
