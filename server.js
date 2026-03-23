@@ -82,7 +82,7 @@ async function initDatabase() {
   const emailDefaults = {
     emailTo: 'rv87@bk.ru',
     smtpHost: 'smtp.mail.ru',
-    smtpPort: '465',
+    smtpPort: '587',
     smtpUser: 'rv87@bk.ru',
     smtpPass: ''
   };
@@ -257,8 +257,15 @@ function createTransporter() {
   const cfg = getEmailConfig();
   if (!cfg.host || !cfg.user || !cfg.pass) return null;
   return nodemailer.createTransport({
-    host: cfg.host, port: cfg.port, secure: cfg.port === 465,
-    auth: { user: cfg.user, pass: cfg.pass }
+    host: cfg.host,
+    port: cfg.port,
+    secure: cfg.port === 465,
+    auth: { user: cfg.user, pass: cfg.pass },
+    tls: { rejectUnauthorized: false },
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 15000,
+    dnsTimeout: 10000
   });
 }
 
